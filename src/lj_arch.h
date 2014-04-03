@@ -330,7 +330,7 @@
 #error "Need at least GCC 4.2 or newer"
 #endif
 #elif !LJ_TARGET_PS3
-#if (__GNUC__ < 4) || ((__GNUC__ == 4) && __GNUC_MINOR__ < 3)
+#if (__GNUC__ < 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ < 3))
 #error "Need at least GCC 4.3 or newer"
 #endif
 #endif
