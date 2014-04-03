@@ -25,6 +25,8 @@
 #define LUAJIT_ARCH_ppcspe	5
 #define LUAJIT_ARCH_MIPS	6
 #define LUAJIT_ARCH_mips	6
+#define LUAJIT_ARCH_THUMB	7
+#define LUAJIT_ARCH_thumb	7
 
 /* Target OS. */
 #define LUAJIT_OS_OTHER		0
@@ -42,7 +44,11 @@
 #elif defined(__x86_64__) || defined(__x86_64) || defined(_M_X64) || defined(_M_AMD64)
 #define LUAJIT_TARGET	LUAJIT_ARCH_X64
 #elif defined(__arm__) || defined(__arm) || defined(__ARM__) || defined(__ARM)
+#if __ARM_ARCH_6M__ || __ARM_ARCH_7M__ || __ARM_ARCH_7EM__
+#define LUAJIT_TARGET	LUAJIT_ARCH_THUMB
+#else
 #define LUAJIT_TARGET	LUAJIT_ARCH_ARM
+#endif
 #elif defined(__ppc__) || defined(__ppc) || defined(__PPC__) || defined(__PPC) || defined(__powerpc__) || defined(__powerpc) || defined(__POWERPC__) || defined(__POWERPC) || defined(_M_PPC)
 #ifdef __NO_FPRS__
 #define LUAJIT_TARGET	LUAJIT_ARCH_PPCSPE
@@ -158,6 +164,36 @@
 #elif LUAJIT_TARGET == LUAJIT_ARCH_ARM
 
 #define LJ_ARCH_NAME		"arm"
+#define LJ_ARCH_BITS		32
+#define LJ_ARCH_ENDIAN		LUAJIT_LE
+#if !defined(LJ_ARCH_HASFPU) && __SOFTFP__
+#define LJ_ARCH_HASFPU		0
+#endif
+#if !defined(LJ_ABI_SOFTFP) && !__ARM_PCS_VFP
+#define LJ_ABI_SOFTFP		1
+#endif
+#define LJ_ABI_EABI		1
+#define LJ_TARGET_ARM		1
+#define LJ_TARGET_EHRETREG	0
+#define LJ_TARGET_JUMPRANGE	25	/* +-2^25 = +-32MB */
+#define LJ_TARGET_MASKSHIFT	0
+#define LJ_TARGET_MASKROT	1
+#define LJ_TARGET_UNIFYROT	2	/* Want only IR_BROR. */
+#define LJ_ARCH_NUMMODE		LJ_NUMMODE_DUAL
+
+#if __ARM_ARCH_7__ || __ARM_ARCH_7A__ || __ARM_ARCH_7R__ || __ARM_ARCH_7S__
+#define LJ_ARCH_VERSION		70
+#elif __ARM_ARCH_6T2__
+#define LJ_ARCH_VERSION		61
+#elif __ARM_ARCH_6__ || __ARM_ARCH_6J__ || __ARM_ARCH_6K__ || __ARM_ARCH_6Z__ || __ARM_ARCH_6ZK__
+#define LJ_ARCH_VERSION		60
+#else
+#define LJ_ARCH_VERSION		50
+#endif
+
+#elif LUAJIT_TARGET == LUAJIT_ARCH_THUMB
+
+#define LJ_ARCH_NAME		"thumb"
 #define LJ_ARCH_BITS		32
 #define LJ_ARCH_ENDIAN		LUAJIT_LE
 #if !defined(LJ_ARCH_HASFPU) && __SOFTFP__
@@ -313,9 +349,6 @@
 #elif LJ_TARGET_ARM
 #if defined(__ARMEB__)
 #error "No support for big-endian ARM"
-#endif
-#if __ARM_ARCH_6M__ || __ARM_ARCH_7M__ || __ARM_ARCH_7EM__
-#error "No support for Cortex-M CPUs"
 #endif
 #if !(__ARM_EABI__ || LJ_TARGET_IOS)
 #error "Only ARM EABI or iOS 3.0+ ABI is supported"

@@ -213,6 +213,9 @@ else
 ifneq (,$(findstring LJ_TARGET_X86 ,$(TARGET_TESTARCH)))
   TARGET_LJARCH= x86
 else
+ifneq (,$(findstring LJ_TARGET_THUMB ,$(TARGET_TESTARCH)))
+  TARGET_LJARCH= thumb
+else
 ifneq (,$(findstring LJ_TARGET_ARM ,$(TARGET_TESTARCH)))
   TARGET_LJARCH= arm
 else
@@ -429,6 +432,7 @@ ifeq (ppc,$(TARGET_LJARCH))
   ifeq (PS3,$(TARGET_SYS))
     DASM_AFLAGS+= -D PPE -D TOC
   endif
+endif
 endif
 endif
 endif
