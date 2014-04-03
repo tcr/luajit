@@ -49,7 +49,7 @@ typedef LJ_ALIGN(16) union FPRArg {
 
 typedef intptr_t GPRArg;
 
-#elif LJ_TARGET_ARM
+#elif LJ_TARGET_ARM || LJ_TARGET_THUMB
 
 #define CCALL_NARG_GPR		4
 #define CCALL_NRET_GPR		2	/* For softfp double. */

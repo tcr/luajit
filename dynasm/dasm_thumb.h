@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define DASM_ARCH		"arm"
+#define DASM_ARCH		"thumb"
 
 #ifndef DASM_EXTERN
 #define DASM_EXTERN(a,b,c,d)	0

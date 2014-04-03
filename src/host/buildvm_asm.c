@@ -95,7 +95,7 @@ static void emit_asm_wordreloc(BuildCtx *ctx, uint8_t *p, int n,
   uint32_t ins;
   emit_asm_words(ctx, p, n-4);
   ins = *(uint32_t *)(p+n-4);
-#if LJ_TARGET_ARM
+#if LJ_TARGET_ARM || LJ_TARGET_THUMB
   if ((ins & 0xff000000u) == 0xfa000000u) {
     fprintf(ctx->fp, "\tblx %s\n", sym);
   } else if ((ins & 0x0e000000u) == 0x0a000000u) {
@@ -135,7 +135,7 @@ static void emit_asm_wordreloc(BuildCtx *ctx, uint8_t *p, int n,
 }
 #endif
 
-#if LJ_TARGET_ARM
+#if LJ_TARGET_ARM || LJ_TARGE_THUMB
 #define ELFASM_PX	"%%"
 #else
 #define ELFASM_PX	"@"
@@ -225,7 +225,7 @@ void emit_asm(BuildCtx *ctx)
   if (ctx->mode != BUILD_machasm)
     fprintf(ctx->fp, ".Lbegin:\n");
 
-#if LJ_TARGET_ARM && defined(__GNUC__) && !LJ_NO_UNWIND
+#if (LJ_TARGET_ARM || LJ_TARGET_THUMB) && defined(__GNUC__) && !LJ_NO_UNWIND
   /* This should really be moved into buildvm_arm.dasc. */
   fprintf(ctx->fp,
 	  ".fnstart\n"
@@ -239,7 +239,7 @@ void emit_asm(BuildCtx *ctx)
   for (i = rel = 0; i < ctx->nsym; i++) {
     int32_t ofs = ctx->sym[i].ofs;
     int32_t next = ctx->sym[i+1].ofs;
-#if LJ_TARGET_ARM && defined(__GNUC__) && !LJ_NO_UNWIND && LJ_HASFFI
+#if (LJ_TARGET_ARM || LJ_TARGET_THUMB) && defined(__GNUC__) && !LJ_NO_UNWIND && LJ_HASFFI
     if (!strcmp(ctx->sym[i].name, "lj_vm_ffi_call"))
       fprintf(ctx->fp,
 	      ".globl lj_err_unwind_arm\n"
@@ -274,7 +274,7 @@ void emit_asm(BuildCtx *ctx)
 #endif
   }
 
-#if LJ_TARGET_ARM && defined(__GNUC__) && !LJ_NO_UNWIND
+#if (LJ_TARGET_ARM || LJ_TARGET_THUMB) && defined(__GNUC__) && !LJ_NO_UNWIND
   fprintf(ctx->fp,
 #if !LJ_HASFFI
 	  ".globl lj_err_unwind_arm\n"
