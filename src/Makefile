@@ -103,7 +103,7 @@ XCFLAGS=
 #XCFLAGS+= -DLUAJIT_ENABLE_LUA52COMPAT
 #
 # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
-#XCFLAGS+= -DLUAJIT_DISABLE_JIT
+XCFLAGS+= -DLUAJIT_DISABLE_JIT
 #
 # Some architectures (e.g. PPC) can use either single-number (1) or
 # dual-number (2) mode. Uncomment one of these lines to override the
@@ -372,7 +372,7 @@ ifeq (,$(HOST_LUA))
 endif
 
 DASM_DIR= ../dynasm
-DASM= $(HOST_LUA) $(DASM_DIR)/dynasm.lua
+DASM= luajit $(DASM_DIR)/dynasm.lua
 DASM_XFLAGS=
 DASM_AFLAGS=
 DASM_ARCH= $(TARGET_LJARCH)
@@ -605,6 +605,10 @@ $(MINILUA_T): $(MINILUA_O)
 
 host/buildvm_arch.h: $(DASM_DASC) $(DASM_DEP)
 	$(E) "DYNASM    $@"
+	echo $(DASM)
+	echo $(DASM_FLAGS)
+	echo $@
+	echo $(DASM_DASC)
 	$(Q)$(DASM) $(DASM_FLAGS) -o $@ $(DASM_DASC)
 
 host/buildvm.o: $(DASM_DIR)/dasm_*.h

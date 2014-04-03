@@ -190,6 +190,32 @@
 #define LJ_ARCH_VERSION		50
 #endif
 
+#elif LUAJIT_TARGET == LUAJIT_ARCH_THUMB
+
+#define LJ_ARCH_NAME		"thumb"
+#define LJ_ARCH_BITS		32
+#define LJ_ARCH_ENDIAN		LUAJIT_LE
+#define LJ_ARCH_HASFPU		0
+#define LJ_ABI_SOFTFP		1
+#define LJ_ABI_EABI		1
+#define LJ_TARGET_THUMB		1
+#define LJ_TARGET_EHRETREG	0
+#define LJ_TARGET_JUMPRANGE	25	/* +-2^25 = +-32MB */
+#define LJ_TARGET_MASKSHIFT	0
+#define LJ_TARGET_MASKROT	1
+#define LJ_TARGET_UNIFYROT	2	/* Want only IR_BROR. */
+#define LJ_ARCH_NUMMODE		LJ_NUMMODE_DUAL
+
+#if __ARM_ARCH_7__ || __ARM_ARCH_7A__ || __ARM_ARCH_7R__ || __ARM_ARCH_7S__
+#define LJ_ARCH_VERSION		70
+#elif __ARM_ARCH_6T2__
+#define LJ_ARCH_VERSION		61
+#elif __ARM_ARCH_6__ || __ARM_ARCH_6J__ || __ARM_ARCH_6K__ || __ARM_ARCH_6Z__ || __ARM_ARCH_6ZK__
+#define LJ_ARCH_VERSION		60
+#else
+#define LJ_ARCH_VERSION		50
+#endif
+
 #elif LUAJIT_TARGET == LUAJIT_ARCH_PPC
 
 #define LJ_ARCH_NAME		"ppc"
