@@ -196,14 +196,10 @@
 #define LJ_ARCH_NAME		"thumb"
 #define LJ_ARCH_BITS		32
 #define LJ_ARCH_ENDIAN		LUAJIT_LE
-#if !defined(LJ_ARCH_HASFPU) && __SOFTFP__
 #define LJ_ARCH_HASFPU		0
-#endif
-#if !defined(LJ_ABI_SOFTFP) && !__ARM_PCS_VFP
 #define LJ_ABI_SOFTFP		1
-#endif
 #define LJ_ABI_EABI		1
-#define LJ_TARGET_ARM		1
+#define LJ_TARGET_THUMB		1
 #define LJ_TARGET_EHRETREG	0
 #define LJ_TARGET_JUMPRANGE	25	/* +-2^25 = +-32MB */
 #define LJ_TARGET_MASKSHIFT	0
