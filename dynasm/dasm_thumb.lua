@@ -289,8 +289,6 @@ local map_op = {
   ["eor.w_4"] = "sdnmT:11101010100snnnn0iiiddddiiTTmmmm",
   ["eor_2"] = "sdm:0100000001mmmddd",
   ["isb_1"] = "y:1111001110111111100011110110oooo",
-  ["it_1"] = "cM:10111111cccc1000",
-  ["ite_1"] = "cM:10111111cccc0100",
   ["ldm_2"] = "nr:11001nnnrrrrrrrr",
   ["ldr_2"] = "tL:01101fffffnnnttt|tL:10011tttffffffff|tL:0101100mmmnnnttt|tB:01001tttffffffff",
   ["ldr.w_2"] = "tL:111110001101nnnnttttiiiiiiiiiiii|tL:111110000101nnnntttt1PUWiiiiiiii|tL:111110000101nnnntttt000000iimmmm|tB:11111000u1011111ttttiiiiiiiiiiii",
@@ -466,12 +464,14 @@ do
   end
 end
 
-function tobitstr (num)
+function tobitstr (num, len)
     local t={}
-    while num>0 do
+    len = len or 0
+    while num>0 or len > 0 do
         rest=num%2
         table.insert(t,1,rest)
         num=(num-rest)/2
+        len = len - 1
     end
     return table.concat(t)
 end
@@ -490,25 +490,31 @@ do
   end
 end
 
--- adds conditional varants
+-- add conditional variants
 do
   local addt = {}
   for cond,c in pairs(map_cond) do
     for k,v in pairs(map_op) do
-      local s = k:gsub("([.]?w?)(_%d+)$", cond .. "%1%2")
-      addt[s] = v:gsub('cccc', ('0000' .. tobitstr(c)):sub(-4))
+      if k ~= 'b_1' and b ~= 'b.w_1' then
+        local s = k:gsub("([.]?w?)(_%d+)$", cond .. "%1%2")
+        addt[s] = '#C' .. cond .. '|' .. k
+      else
+        local s = k:gsub("([.]?w?)(_%d+)$", cond .. "%1%2")
+        addt[s] = v:gsub("cccc", tobitstr(c, 4))
+      end
     end
   end
   for k,v in pairs(addt) do
-    if not map_op[k] then
-      map_op[k] = v
-    else
-      map_op[k] = map_op[k] .. '|' .. v
-    end
+    map_op[k] = v
   end
 end
 
--- exit()
+-- add it* variants
+do
+  for it in gmatch('it|ite|itt|itee|itet|itte|ittt|iteee|iteet|itete|itett|ittee|ittet|ittte|itttt', "[^|]+") do
+    map_op[it .. '_1'] = '#c' .. it
+  end
+end
 
 
 -- Add mnemonics for "s" variants.
@@ -1027,8 +1033,56 @@ local function parse_template_new(params, template, nparams, pos)
   return pos + #template-1
 end
 
+local itstate, itstatecond, itstateexplicit, itstatepos = nil, nil, nil
+
 map_op[".template__"] = function(params, template, nparams)
   if not params then return sub(template, 9) end
+
+  local function itreset ()
+    if itstateexplicit and itstateexplicit ~= itstate then
+      local err = 'conditional statement does not match conditional "' .. itstate .. '"'
+      itstate, itstatecond, itstateexplicit = nil, nil, nil
+      werror(err)
+    end
+    local mask, maskstr = 0x8, itstate:sub(3)
+    while #maskstr > 0 do
+      if maskstr:sub(1,1) == 't' then
+        mask = shl(itstatecond % 2, 3) + shr(mask, 1)
+      else 
+        mask = shl((itstatecond + 1) % 2, 3) + shr(mask, 1)
+      end
+      maskstr = maskstr:sub(2)
+    end
+    wputpos(itstatepos, 0xbf00 + shl(itstatecond, 4) + mask)
+    itstate, itstatecond, itstateexplicit = nil, nil, nil
+  end
+
+  -- command like and[le]
+  if sub(template, 1, 2) == '#C' then
+    -- need it value and their negatives
+    local cond = map_cond[template:sub(3, 4)]
+    template = map_op[template:sub(6)]
+    if itstate and shr(cond, 1) ~= shr(itstatecond, 1) then
+      itreset()
+    end
+    if itstate == nil then
+      -- implicit conditional
+      itstate, itstatepos, itstatecond, itstateexplicit = 'it', wpos(), cond, nil
+    else
+      itstate = itstate .. (cond == itstatecond and 't' or 'e')
+    end
+  elseif itstate then
+    itreset()
+  end
+
+  -- explicit IT conditional
+  if sub(template, 1, 2) == '#c' then
+    itstateexplicit = template:sub(3)
+    itstate = 'i'
+    itstatepos = wpos()
+    itstatecond = map_cond[params[1]]
+    return
+  end
 
   -- Limit number of section buffer positions used by a single dasm_put().
   -- A single opcode needs a maximum of 3 positions.
