@@ -4410,7 +4410,6 @@ static int build_backend(BuildCtx *ctx)
   int op;
 
   dasm_growpc(Dst, BC__MAX);
-
   build_subroutines(ctx);
 
   |.code_op
