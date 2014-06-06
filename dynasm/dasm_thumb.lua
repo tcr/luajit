@@ -101,6 +101,7 @@ local function waction(action, val, a, num)
   local w = assert(map_action[action], "bad action name `"..action.."'")
   wputxw(0xffff)
   wputxw(w + (val or 0))
+  if (val == 300) then TCR_LOG('WERAWERAWERWERWER'); end
   if a then actargs[#actargs+1] = a end
   if a or num then secpos = secpos + (num or 1) end
 end
@@ -570,7 +571,7 @@ local function parse_reglist(reglist)
   return rr
 end
 
-local function parse_imm(imm, bits, shift, scale, signed)
+local function parse_imm(imm, bits, shift, scale, signed, instrlen)
   -- bits: bits available
   -- shift: bits to shift left in value (useless except in waction)
   -- scale: value shifted left by how much?
@@ -598,7 +599,15 @@ local function parse_imm(imm, bits, shift, scale, signed)
     -- for k,v in pairs(_G.__params) do
     --   TCR_LOG('-->', k, v)
     -- end
-    waction("IMM", (signed and shl(1, 15) or 0) + shl(scale, 10) + shl(bits, 5) + shift, imm)
+
+    -- 000000000000 - 12 bits
+    -- signed:1, bits:5, shift:4, scale:2
+    -- if instrlen == 1 then werror('IMM required to be word-length') end
+    if shift > 15 then werror('IMM shift too big: ' .. shift) end
+    if bits > 31 then werror('IMM bits too big: ' .. bits) end
+    if scale > 3 then werror('IMM scale too big: ' .. scale) end
+    if not signed then werror('IMM must be signed') end
+    waction("IMM", (signed and shl(1, 11) or 0) + shl(bits + 1, 6) + shl(shift, 2) + scale, imm)
     return 0
   end
 end
@@ -706,7 +715,7 @@ function populate_op_word (word, values)
   return op
 end
 
-local function parse_template_new_subset(bits, shifts, values, params, templatestr, nparams)
+local function parse_template_new_subset(bits, shifts, values, params, templatestr, nparams, instrlen)
   local n = 1
   
   -- TCR_LOG('PARSETEMPLATE: ' .. templatestr)
@@ -728,7 +737,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
       end
 
       if bits['i'] then
-        values[p] = parse_imm(imm, bits['i'], shifts['i'], 0, false)
+        values[p] = parse_imm(imm, bits['i'], shifts['i'], 0, false, instrlen)
         if values[p] >= math.pow(2, bits[p]) then
           werror('immediate operand larger than ' .. bits[p] .. ' bits')
         end
@@ -922,9 +931,9 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
               values['U'] = 0
             end
             if bits['i'] then
-              values['i'] = parse_imm(imm, bits['i'], shifts['i'], 0, false)
+              values['i'] = parse_imm(imm, bits['i'], shifts['i'], 0, bits['U'], instrlen)
             elseif bits['f'] then
-              values['f'] = parse_imm(imm, bits['f'], shifts['f'], 2, false)
+              values['f'] = parse_imm(imm, bits['f'], shifts['f'], 2, bits['U'], instrlen)
             else
               werror('immediate not supported')
             end
@@ -955,13 +964,17 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
                 imm = sub(imm, 2)
                 values['U'] = 0
               end
+
+            -- TCR_LOG('bits', bits['i'], bits['f'])
               if bits['i'] then
-                values['i'] = parse_imm(imm, bits['i'], shifts['i'], 0, false)
+                values['i'] = parse_imm(imm, bits['i'], shifts['i'], 0, bits['U'], instrlen)
               elseif bits['f'] then
-                values['f'] = parse_imm(imm, bits['f'], shifts['f'], 2, false)
+                values['f'] = parse_imm(imm, bits['f'], shifts['f'], 2, bits['U'], instrlen)
               else
                 werror('immediate not supported')
               end
+
+            -- TCR_LOG('now?', bits['i'], bits['f'])
             else
               local p2a, p3 = match(p2, "^,%s*([^,%s]*)%s*,?%s*(.*)$")
               local m, neg = parse_gpr_pm(p2a)
@@ -983,25 +996,25 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
         end
       end
 
-    elseif p == '{' then
-      local newpidx = pidx
-      while templatestr:sub(newpidx, newpidx) ~= '}' and newpidx <= #templatestr do
-        newpidx = newpidx + 1
-      end
-      if templatestr:sub(newpidx, newpidx) ~= '}' then
-        werror('no matching ] in definition')
-      end
+    -- elseif p == '{' then
+    --   local newpidx = pidx
+    --   while templatestr:sub(newpidx, newpidx) ~= '}' and newpidx <= #templatestr do
+    --     newpidx = newpidx + 1
+    --   end
+    --   if templatestr:sub(newpidx, newpidx) ~= '}' then
+    --     werror('no matching ] in definition')
+    --   end
 
-      local subparams = {}
-      if params[n]:sub(1, 1) ~= '[' or params[n]:sub(-1, -1) ~= ']' then
-        werror('parameter ' .. tonumber(n) .. ' lacks brackets')
-      end
-      for s in gmatch(params[n]:sub(2, -2), "[^%s,]+") do
-        table.insert(subparams, s)
-      end
-      parse_template_new_subset(bits, values, subparams, templatestr:sub(pidx+1, newpidx-1), #subparams)
-      pidx = newpidx + 1
-      n = n + 1
+    --   local subparams = {}
+    --   if params[n]:sub(1, 1) ~= '[' or params[n]:sub(-1, -1) ~= ']' then
+    --     werror('parameter ' .. tonumber(n) .. ' lacks brackets')
+    --   end
+    --   for s in gmatch(params[n]:sub(2, -2), "[^%s,]+") do
+    --     table.insert(subparams, s)
+    --   end
+    --   parse_template_new_subset(bits, values, subparams, templatestr:sub(pidx+1, newpidx-1), #subparams)
+    --   pidx = newpidx + 1
+    --   n = n + 1
 
     else
       TCR_LOG('UNKNOWN PATTERN:', p)
@@ -1021,7 +1034,7 @@ local function parse_template_new(params, template, nparams, pos)
   _G.__tmp = template
 
   local values = {}
-  parse_template_new_subset(bits, shifts, values, params, template[1], nparams, pos)
+  parse_template_new_subset(bits, shifts, values, params, template[1], nparams, #template - 1)
 
   -- for k,v in pairs(bits) do
   --   TCR_LOG(k .. ' ' .. v)
@@ -1095,7 +1108,7 @@ map_op[".template__"] = function(params, template, nparams)
     for v in gmatch(t_, "[^|:][^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?") do
       table.insert(t, v)
     end
-    
+
     ok, err = pcall(parse_template_new, params, t, nparams, pos)
     if ok then return end
 

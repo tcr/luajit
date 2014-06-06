@@ -135,7 +135,7 @@ static void emit_asm_wordreloc(BuildCtx *ctx, uint8_t *p, int n,
 }
 #endif
 
-#if LJ_TARGET_ARM || LJ_TARGE_THUMB
+#if LJ_TARGET_ARM || LJ_TARGET_THUMB
 #define ELFASM_PX	"%%"
 #else
 #define ELFASM_PX	"@"

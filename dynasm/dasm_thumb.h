@@ -158,10 +158,18 @@ void dasm_setup(Dst_DECL, const void *actionlist)
 #ifdef DASM_CHECKS
 #define CK(x, st) \
   do { if (!(x)) { \
-    D->status = DASM_S_##st|(p-D->actionlist-1); return; } } while (0)
+    D->status = DASM_S_##st|(p-D->actionlist-1);\
+    if (D->status != DASM_S_OK) {\
+      fprintf(stderr, "CK ERROR: line %d (n %x ins %x) start %d offset %d\n", __LINE__, n, ins, start, p - (D->actionlist + start));\
+    }\
+    return; } } while (0)
 #define CKPL(kind, st) \
   do { if ((size_t)((char *)pl-(char *)D->kind##labels) >= D->kind##size) { \
-    D->status = DASM_S_RANGE_##st|(p-D->actionlist-1); return; } } while (0)
+    D->status = DASM_S_RANGE_##st|(p-D->actionlist-1);\
+    if (D->status != DASM_S_OK) {\
+      fprintf(stderr, "CKPL ERROR: index %ld size %ld @ line %d\n", (size_t)((char *)pl-(char *)D->kind##labels), D->kind##size, __LINE__);\
+    }\
+    return; } } while (0)
 #else
 #define CK(x, st)	((void)0)
 #define CKPL(kind, st)	((void)0)
@@ -207,6 +215,11 @@ static uint16_t dasm_immthumb(unsigned int val)
   return (ABCDE << 7) | (val & 0x7F);
 }
 
+#define DASM_IMM_SIGNED(x) ((x >> 11) & 0x1)
+#define DASM_IMM_BITS(x) ((x >> 6) & ((1 << 5)-1))
+#define DASM_IMM_SHIFT(x) ((x >> 2) & ((1 << 4)-1))
+#define DASM_IMM_SCALE(x) ((x >> 0) & ((1 << 2)-1))
+
 /* Pass 1: Store actions and args, link branches/labels, estimate offsets. */
 void dasm_put(Dst_DECL, int start, ...)
 {
@@ -232,6 +245,9 @@ void dasm_put(Dst_DECL, int start, ...)
     uint16_t ins = *p++;
     // unsigned int action = ((ins >> 4) & 0xf);
     // if ((action & 0xff00) != 0xff00) {
+
+    // ins = action value
+    // n = value as argument
     if (ins != 0xffff) {
     // unsigned int action = (ins >> 16);
     // if (action >= DASM__MAX) {
@@ -283,11 +299,11 @@ void dasm_put(Dst_DECL, int start, ...)
 	break;
       case DASM_IMM:
 #ifdef DASM_CHECKS
-	CK((n & ((1<<((ins>>10)&31))-1)) == 0, RANGE_I);
-	if ((ins & 0x8000))
-	  CK(((n + (1<<(((ins>>5)&31)-1)))>>((ins>>5)&31)) == 0, RANGE_I);
-	else
-	  CK((n>>((ins>>5)&31)) == 0, RANGE_I);
+        CK((n & ((1<<DASM_IMM_SCALE(ins))-1)) == 0, RANGE_I); // test scale
+        if (DASM_IMM_SIGNED(ins)) // signed
+          CK(((n + (1<<(DASM_IMM_BITS(ins)-1)))>>DASM_IMM_BITS(ins)) == 0, RANGE_I);
+        else
+          CK((n>>DASM_IMM_BITS(ins)) == 0, RANGE_I);
 #endif
 	b[pos++] = n;
 	break;
@@ -454,7 +470,7 @@ int dasm_encode(Dst_DECL, void *buffer)
         	  break;
         	case DASM_LABEL_PC: break;
         	case DASM_IMM:
-        	  cp[-1] |= ((n>>((ins>>10)&31)) & ((1<<((ins>>5)&31))-1)) << (ins&31);
+        	  cp[-1] |= ((n>>(DASM_IMM_SCALE(ins))) & ((1<<(DASM_IMM_BITS(ins)))-1)) << (DASM_IMM_SHIFT(ins));
         	  break;
         	case DASM_IMMTHUMB:
             thumbexp = dasm_immthumb((unsigned int)n);
