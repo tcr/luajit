@@ -349,7 +349,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  ldr L, SAVE_L
   |   mv_vmstate CARG4, C
   |  ldr GL:CARG3, L->glref
-  |   str CARG4, GL:CARG3->vmstate
+  |   str.w CARG4, GL:CARG3->vmstate
   |  b ->vm_leave_unw
   |
   |->vm_unwind_ff:			// Unwind C stack, return from ff pcall.

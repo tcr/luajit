@@ -905,11 +905,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
           if not tp then
             werror("expected address operand")
           end
-          
-          -- FIXME: CKPL/REL_LG issue
-          -- This was generating an invalid REL_LG command. Commented out, must be uncommented
-          -- waction(ext and "IMML8" or "IMML12", 32768 + 32*(ext and 8 or 12), format(tp.ctypefmt, tailr))
-
+          waction("IMM", shl(0, 1) + shl(bits['i'] or bits['f'], 6) + shl(shifts['i'] or shifts['f'] or 0, 2) + (bits['f'] and 2 or 0), format(tp.ctypefmt, tailr))
           -- op = op + shl(d, 16) + 0x01000000 + (ext and 0x00400000 or 0)
         end
 
@@ -1036,8 +1032,6 @@ local function parse_template_new(params, template, nparams, pos)
     parse_op_word(template[i], bits, shifts)
   end
 
-  _G.__tmp = template
-
   local values = {}
   parse_template_new_subset(bits, shifts, values, params, template[1], nparams, #template - 1)
 
@@ -1113,6 +1107,8 @@ map_op[".template__"] = function(params, template, nparams)
     for v in gmatch(t_, "[^|:][^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?[^:]?") do
       table.insert(t, v)
     end
+
+    _G.__tmp = template
 
     ok, err = pcall(parse_template_new, params, t, nparams, pos)
     if ok then return end
