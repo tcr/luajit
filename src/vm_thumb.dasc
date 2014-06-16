@@ -2046,7 +2046,7 @@ static void build_subroutines(BuildCtx *ctx)
   |5:  // Re-dispatch to static ins.
   |  decode_OP OP, INS
   |  add OP, DISPATCH, OP, lsl #2
-  |  ldr pc, [OP, #GG_DISP2STATIC]
+  |  ldr.w pc, [OP, #GG_DISP2STATIC]
   |
   |->vm_inshook:			// Dispatch target for instr/line hooks.
   |  ldrb CARG1, [DISPATCH, #DISPATCH_GL(hookmask)]
@@ -2072,7 +2072,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  ldrb OP, [PC, #-4]
   |   ldr INS, [PC, #-4]
   |  add OP, DISPATCH, OP, lsl #2
-  |  ldr OP, [OP, #GG_DISP2STATIC]
+  |  ldr.w OP, [OP, #GG_DISP2STATIC]
   |   decode_RA8 RA, INS
   |   decode_RD RC, INS
   |  bx OP
