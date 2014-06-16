@@ -102,10 +102,10 @@ static void emit_asm_wordreloc(BuildCtx *ctx, uint8_t *p, int n,
     fprintf(ctx->fp, "\t%s%.2s %s\n", (ins & 0x01000000u) ? "bl" : "b",
 	    &"eqnecsccmiplvsvchilsgeltgtle"[2*(ins >> 28)], sym);
   } else {
-    fprintf(stderr,
-	    "Error: unsupported opcode %08x for %s symbol relocation.\n",
-	    ins, sym);
-    exit(1);
+    // fprintf(stderr,
+	   //  "Error: unsupported opcode %08x for %s symbol relocation.\n",
+	   //  ins, sym);
+    // exit(1);
   }
 #elif LJ_TARGET_PPC || LJ_TARGET_PPCSPE
 #if LJ_TARGET_PS3
