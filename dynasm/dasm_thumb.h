@@ -299,15 +299,13 @@ void dasm_put(Dst_DECL, int start, ...)
 	break;
       case DASM_IMM:
 #ifdef DASM_CHECKS
-        // printf("COMMAND: %x %x %x %x\n", *(p-4), *(p-3), *(p-2), *(p-1));
-
-        // If value n is a smaller value than proposed scale, abort.
+        // If n (value) does not fit in desired integer, abort.
         if (DASM_IMM_SIGNED(ins) && n < 0) {
           CK(((0-n) & ((1<<DASM_IMM_SCALE(ins))-1)) == 0, RANGE_I); // test scale
           CK(((0-n)>>DASM_IMM_BITS(ins)) == 0, RANGE_I); // test bits
         } else {
-          CK((n & ((1<<DASM_IMM_SCALE(ins))-1)) == 0, RANGE_I); // test scale
-          CK((n>>DASM_IMM_BITS(ins)) == 0, RANGE_I); // test bits
+          CK((n & ((1<<DASM_IMM_SCALE(ins))-1)) == 0, RANGE_I); // test scale 
+          CK(((n>>DASM_IMM_SCALE(ins))>>DASM_IMM_BITS(ins)) == 0, RANGE_I); // test bits
         }
 #endif
 	b[pos++] = n;
