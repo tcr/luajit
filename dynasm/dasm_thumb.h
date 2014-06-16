@@ -449,22 +449,17 @@ int dasm_encode(Dst_DECL, void *buffer)
         	  n = *DASM_POS2PTR(D, n) - (int)((char *)cp - base) - 4;
         	patchrel:
                 // printf("DASM_REL_PC -> %x %x\n", ins & 0x800, n);
-        	  if ((ins & 0x800) == 0) {
-        	    CK((n & 3) == 0 && ((n+0x02000000) >> 26) == 0, RANGE_REL);
-                    // printf("ASM -> %x\n", cp[-1]);
-                    // printf("  n -> %x\n", (ins & 2047) - 10);
-                    // printf("HERE %x \n", n);
+        	  if ((ins & 0xf800) == 0xe000) {
+                    // 11100[11:imm]
+        	    CK((n & 3) == 0 && -0x400 <= n && n <= 0x3ff, RANGE_REL);
         	    cp[-1] |= ((n >> 1) & 0x000000ff) + 1;
-                    // printf("!!! -> %x\n", cp[-1]);
-        	  } else if ((ins & 0x1000)) {
-        	    CK((n & 3) == 0 && -256 <= n && n <= 256, RANGE_REL);
+        	  } else if ((ins & 0xf000) == 0xd000) {
+                    // 1101[4:cond][8:imm]
+        	    CK((n & 3) == 0 && -0x80 <= n && n <= 0x7f, RANGE_REL);
         	    goto patchimml8;
-        	  } else if ((ins & 0x2000) == 0) {
-        	    CK((n & 3) == 0 && -4096 <= n && n <= 4096, RANGE_REL);
-        	    goto patchimml;
-        	  } else {
-        	    CK((n & 3) == 0 && -1020 <= n && n <= 1020, RANGE_REL);
-        	    n >>= 2;
+        	  } else if ((ins & 0xf800) == 0xf000) {
+                    // 11110[1:S][4:cond][6:imm] 10[1:J]0[1:J][11:imm]
+        	    CK((n & 3) == 0 && -0x10000 <= n && n <= 0xffff, RANGE_REL);
         	    goto patchimml;
         	  }
         	  break;
