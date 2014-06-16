@@ -295,8 +295,8 @@ local map_op = {
   ["ldr.w_2"] = "tL:111110001101nnnnttttiiiiiiiiiiii|tL:111110000101nnnntttt1PUWiiiiiiii|tL:111110000101nnnntttt000000iimmmm|tB:11111000u1011111ttttiiiiiiiiiiii",
   ["ldr.w_3"] = "tL:111110000101nnnntttt1PUWiiiiiiii",
   ["ldrb_2"] = "tL:01111iiiiinnnttt|tL:0101110mmmnnnttt",
-  ["ldrb.w_3"] = "tL:111110000001nnnntttt1PUWffffffff|tL:111110000001nnnntttt000000iimmmm",
-  ["ldrb.w_2"] = "tL:111110000001nnnntttt1PUWffffffff|tL:111110001001nnnnttttiiiiiiiiiiii|tB:11111000u0011111ttttiiiiiiiiiiii",
+  ["ldrb.w_3"] = "tL:111110000001nnnntttt1PUWiiiiiiii|tL:111110000001nnnntttt000000iimmmm",
+  ["ldrb.w_2"] = "tL:111110000001nnnntttt1PUWiiiiiiii|tL:111110001001nnnnttttiiiiiiiiiiii|tB:11111000u0011111ttttiiiiiiiiiiii",
   ["ldrbt_2"] = "tL:111110000001nnnntttt1110iiiiiiii",
   ["ldrex_2"] = "tL:111010000101nnnntttt1111ffffffff",
   ["ldrexb_2"] = "tL:111010001101nnnntttt111101001111",
@@ -606,7 +606,9 @@ local function parse_imm(imm, bits, shift, scale, signed, instrlen)
     if shift > 15 then werror('IMM shift too big: ' .. shift) end
     if bits > 31 then werror('IMM bits too big: ' .. bits) end
     if scale > 3 then werror('IMM scale too big: ' .. scale) end
-    if not signed then werror('IMM must be signed') end
+    if imm ~= 'GG_DISP2STATIC' then
+      if not signed then werror('IMM must be signed') end
+    end
     waction("IMM", (signed and shl(1, 11) or 0) + shl(bits + 1, 6) + shl(shift, 2) + scale, imm)
     return 0
   end
@@ -903,8 +905,11 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
           if not tp then
             werror("expected address operand")
           end
-          waction(ext and "IMML8" or "IMML12", 32768 + 32*(ext and 8 or 12),
-          format(tp.ctypefmt, tailr))
+          
+          -- FIXME: CKPL/REL_LG issue
+          -- This was generating an invalid REL_LG command. Commented out, must be uncommented
+          -- waction(ext and "IMML8" or "IMML12", 32768 + 32*(ext and 8 or 12), format(tp.ctypefmt, tailr))
+
           -- op = op + shl(d, 16) + 0x01000000 + (ext and 0x00400000 or 0)
         end
 
