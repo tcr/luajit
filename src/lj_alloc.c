@@ -166,7 +166,34 @@ static LJ_AINLINE int CALL_MUNMAP(void *ptr, size_t size)
 #else
 
 #include <errno.h>
+
+#ifndef LJ_TARGET_THUMB
 #include <sys/mman.h>
+#else
+
+#define PROT_READ 0
+#define PROT_WRITE 0
+#define MAP_PRIVATE 0
+#define MAP_ANONYMOUS 0
+
+void *mmap (void *addr, size_t length, int prot, int flags, int fd, size_t offset)
+{
+  (void) addr;
+  (void) prot;
+  (void) flags,
+  (void) fd;
+  (void) offset;
+  return calloc(1, length);
+}
+
+int munmap (void* address, size_t size)
+{
+  (void) size;
+  free(address);
+  return 0;
+}
+
+#endif
 
 #define MMAP_PROT		(PROT_READ|PROT_WRITE)
 #if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
@@ -263,8 +290,8 @@ static LJ_AINLINE void *CALL_MMAP(size_t size)
 
 #endif
 
-#define INIT_MMAP()		((void)0)
-#define DIRECT_MMAP(s)		CALL_MMAP(s)
+#define INIT_MMAP()   ((void)0)
+#define DIRECT_MMAP(s)    CALL_MMAP(s)
 
 static LJ_AINLINE int CALL_MUNMAP(void *ptr, size_t size)
 {
@@ -295,10 +322,10 @@ static LJ_AINLINE void *CALL_MREMAP_(void *ptr, size_t osz, size_t nsz,
 #endif
 #endif
 
-#endif
-
 #ifndef CALL_MREMAP
 #define CALL_MREMAP(addr, osz, nsz, mv) ((void)osz, MFAIL)
+#endif
+
 #endif
 
 /* -----------------------  Chunk representations ------------------------ */
