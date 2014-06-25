@@ -202,7 +202,7 @@ static uint16_t dasm_immthumb(unsigned int val)
     // ...
     // 00000000 00000000 00000001 bcdefgh0
     ABCDE = 8;
-    for (i = 24; i >= 0; i--) { 
+    for (i = 24; i >= 0; i--) {
       if (val == (_bcdefgh << i)) {
         break;
       }
@@ -304,7 +304,7 @@ void dasm_put(Dst_DECL, int start, ...)
           CK(((0-n) & ((1<<DASM_IMM_SCALE(ins))-1)) == 0, RANGE_I); // test scale
           CK(((0-n)>>DASM_IMM_BITS(ins)) == 0, RANGE_I); // test bits
         } else {
-          CK((n & ((1<<DASM_IMM_SCALE(ins))-1)) == 0, RANGE_I); // test scale 
+          CK((n & ((1<<DASM_IMM_SCALE(ins))-1)) == 0, RANGE_I); // test scale
           CK(((n>>DASM_IMM_SCALE(ins))>>DASM_IMM_BITS(ins)) == 0, RANGE_I); // test bits
         }
 #endif
@@ -429,6 +429,7 @@ int dasm_encode(Dst_DECL, void *buffer)
 	uint16_t ins = *p++;
         if (ins == 0xffff) {
                 ins = *p++;
+                uint16_t lastins = cp[-1];
         	// printf("--> %x\n", p);
                 unsigned int action = (ins >> 12);
         	int n = (action >= DASM_ALIGN && action < DASM__MAX) ? *b++ : 0;
@@ -449,19 +450,23 @@ int dasm_encode(Dst_DECL, void *buffer)
         	  n = *DASM_POS2PTR(D, n) - (int)((char *)cp - base) - 4;
         	patchrel:
                 // printf("DASM_REL_PC -> %x %x\n", ins & 0x800, n);
-        	  if ((ins & 0xf800) == 0xe000) {
+        	  if ((lastins & 0xf800) == 0xe000) {
                     // 11100[11:imm]
         	    CK((n & 3) == 0 && -0x400 <= n && n <= 0x3ff, RANGE_REL);
         	    cp[-1] |= ((n >> 1) & 0x000000ff) + 1;
-        	  } else if ((ins & 0xf000) == 0xd000) {
+            } else if ((lastins & 0xf000) == 0xd000) {
                     // 1101[4:cond][8:imm]
         	    CK((n & 3) == 0 && -0x80 <= n && n <= 0x7f, RANGE_REL);
-        	    goto patchimml8;
-        	  } else if ((ins & 0xf800) == 0xf000) {
+                cp[-1] |= ((n >> 1) & 0x000000ff) + 1;
+        	    // goto patchimml8;
+            } else if ((lastins & 0xf800) == 0xf000) {
                     // 11110[1:S][4:cond][6:imm] 10[1:J]0[1:J][11:imm]
         	    CK((n & 3) == 0 && -0x10000 <= n && n <= 0xffff, RANGE_REL);
-        	    goto patchimml;
-        	  }
+                cp[-1] |= ((n >> 1) & 0x000000ff) + 1;
+        	    // goto patchimml;
+            } else {
+                CK(1, RANGE_REL);
+            }
         	  break;
         	case DASM_LABEL_LG:
         	  ins &= 2047; if (ins >= 20) D->globals[ins-10] = (void *)(base + n);
@@ -531,4 +536,3 @@ int dasm_checkstep(Dst_DECL, int secmatch)
   return D->status;
 }
 #endif
-
