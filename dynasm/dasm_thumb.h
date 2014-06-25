@@ -453,7 +453,7 @@ int dasm_encode(Dst_DECL, void *buffer)
         	  if ((lastins & 0xf800) == 0xe000) {
                     // 11100[11:imm]
         	    CK((n & 3) == 0 && -0x400 <= n && n <= 0x3ff, RANGE_REL);
-        	    cp[-1] |= ((n >> 1) & 0x000000ff) + 1;
+        	    cp[-1] |= ((n >> 1) & 0x000007ff) + 1;
             } else if ((lastins & 0xf000) == 0xd000) {
                     // 1101[4:cond][8:imm]
         	    CK((n & 3) == 0 && -0x80 <= n && n <= 0x7f, RANGE_REL);

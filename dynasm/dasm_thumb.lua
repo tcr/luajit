@@ -694,7 +694,7 @@ end
 
 ------------------------------------------------------------------------------
 
-function parse_op_word (word, bits, shifts) 
+function parse_op_word (word, bits, shifts)
   for i=1,#word do
     local bit = word:sub(i, i)
     bits[bit] = (bits[bit] or 0) + 1
@@ -719,7 +719,7 @@ end
 
 local function parse_template_new_subset(bits, shifts, values, params, templatestr, nparams, instrlen)
   local n = 1
-  
+
   -- TCR_LOG('PARSETEMPLATE: ' .. templatestr)
   -- for k,p in pairs(params) do
     -- TCR_LOG(' ..> ', k, p)
@@ -770,7 +770,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
           -- ...
           -- 00000000 00000000 00000001 bcdefgh0
           ABCDE = 8;
-          for i = 24,0,-1 do 
+          for i = 24,0,-1 do
             if val == shl(_bcdefgh, i) then
               break;
             end
@@ -845,6 +845,10 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
       waction("REL_"..mode, n2, s, 1)
       values['u'] = tonumber(n2 >= 10)
       n = n + 1
+
+      if bits['c'] then
+        werror('invalid conditional')
+      end
 
     elseif p == 'c' then
       if params[n] == "le" then
@@ -1060,7 +1064,7 @@ map_op[".template__"] = function(params, template, nparams)
     while #maskstr > 0 do
       if maskstr:sub(1,1) == 't' then
         mask = shl(itstatecond % 2, 3) + shr(mask, 1)
-      else 
+      else
         mask = shl((itstatecond + 1) % 2, 3) + shr(mask, 1)
       end
       maskstr = maskstr:sub(2)
@@ -1297,4 +1301,3 @@ end
 return _M
 
 ------------------------------------------------------------------------------
-
