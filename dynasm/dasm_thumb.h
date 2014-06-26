@@ -188,13 +188,13 @@ static uint16_t dasm_immthumb(unsigned int val)
   if (val == abcdefgh) {
     // 00000000 00000000 00000000 abcdefgh
     ABCDE = 0 + a;
-  } else if (val == (abcdefgh << 16) | abcdefgh) {
+  } else if (val == ((abcdefgh << 16) | abcdefgh)) {
     // 00000000 abcdefgh 00000000 abcdefgh
     ABCDE = 2 + a;
-  } else if (val == (abcdefgh << 24) | (abcdefgh << 8)) {
+  } else if (val == ((abcdefgh << 24) | (abcdefgh << 8))) {
     // abcdefgh 00000000 abcdefgh 00000000
     ABCDE = 4 + a;
-  } else if (val == (abcdefgh << 24) | (abcdefgh << 16) | (abcdefgh << 8) | abcdefgh) {
+  } else if (val == ((abcdefgh << 24) | (abcdefgh << 16) | (abcdefgh << 8) | abcdefgh)) {
     // abcdefgh abcdefgh abcdefgh abcdefgh
     ABCDE = 6 + a;
   } else {
@@ -429,7 +429,6 @@ int dasm_encode(Dst_DECL, void *buffer)
 	uint16_t ins = *p++;
         if (ins == 0xffff) {
                 ins = *p++;
-                uint16_t lastins = cp[-1];
         	// printf("--> %x\n", p);
                 unsigned int action = (ins >> 12);
         	int n = (action >= DASM_ALIGN && action < DASM__MAX) ? *b++ : 0;
@@ -441,6 +440,7 @@ int dasm_encode(Dst_DECL, void *buffer)
         	  goto patchrel;
         	case DASM_ALIGN:
         	  ins &= 255; while ((((char *)cp - base) & ins)) *cp++ = 0xe1a00000;
+            // TODO
         	  break;
         	case DASM_REL_LG:
         	  CK(n >= 0, UNDEF_LG);
@@ -450,22 +450,36 @@ int dasm_encode(Dst_DECL, void *buffer)
         	  n = *DASM_POS2PTR(D, n) - (int)((char *)cp - base) - 4;
         	patchrel:
                 // printf("DASM_REL_PC -> %x %x\n", ins & 0x800, n);
-        	  if ((lastins & 0xf800) == 0xe000) {
+
+                // (single-world "b", but not double-word "bl"), or "ldrd", or "ldr"
+        	  if (((cp[-1] & 0xf000) == 0xd000 && ((cp[-2] & 0xf000) != 0xf000)) || ((cp[-2] & 0xfe00) == 0xe800) || ((cp[-1] & 0xf800) == 0x4800)) {
+                   // 1101[4:cond][8:imm]
+               CK((n & 1) == 0 && -256 <= n && n <= 254, RANGE_REL);
+               cp[-1] |= ((n >> 1) & 0x000000ff) + 1;
+               // goto patchimml8;
+           } else if (((cp[-1] & 0xf800) == 0x4800)) {
+                // ldr 01001[3:Rt][8:imm]
+            CK((n & 3) == 0 && -256 <= n && n <= 254, RANGE_REL);
+            cp[-1] |= ((n >> 3) & 0x000000ff) + 1;
+            // goto patchimml8;
+        } else if ((cp[-1] & 0xf800) == 0xe000) {
                     // 11100[11:imm]
-        	    CK((n & 3) == 0 && -0x400 <= n && n <= 0x3ff, RANGE_REL);
+        	    CK((n & 1) == 0 && -2048 <= n && n <= 2046, RANGE_REL);
         	    cp[-1] |= ((n >> 1) & 0x000007ff) + 1;
-            } else if ((lastins & 0xf000) == 0xd000) {
-                    // 1101[4:cond][8:imm]
-        	    CK((n & 3) == 0 && -0x80 <= n && n <= 0x7f, RANGE_REL);
-                cp[-1] |= ((n >> 1) & 0x000000ff) + 1;
-        	    // goto patchimml8;
-            } else if ((lastins & 0xf800) == 0xf000) {
+            } else if ((cp[-2] & 0xf800) == 0xf000) {
                     // 11110[1:S][4:cond][6:imm] 10[1:J]0[1:J][11:imm]
-        	    CK((n & 3) == 0 && -0x10000 <= n && n <= 0xffff, RANGE_REL);
-                cp[-1] |= ((n >> 1) & 0x000000ff) + 1;
+        	    CK((n & 1) == 0 && -1048576 <= n && n <= 1048574, RANGE_REL);
+                if (n < 0) {
+                    cp[-2] |= (1 << 10) | ((n >> 12) & 0x3ff);
+                    cp[-1] |= (((n >> 1) & 0x000007fe) + 3) | (n & (1 << 23) ? (1 << 11) : 0) | (n & (1 << 24) ? (1 << 13) : 0);
+                } else {
+                    cp[-2] |= ((n >> 12) & 0x3ff);
+                    cp[-1] |= (((n >> 1) & 0x000007fe) + 2) | (n & (1 << 23) ? (1 << 11) : 0) | (n & (1 << 24) ? (1 << 13) : 0);
+                }
         	    // goto patchimml;
             } else {
-                CK(1, RANGE_REL);
+                printf("Invalid branch opcode (%x) %x at %d\n", cp[-2], cp[-1], p - D->actionlist);
+                CK(0, RANGE_REL);
             }
         	  break;
         	case DASM_LABEL_LG:
@@ -484,13 +498,14 @@ int dasm_encode(Dst_DECL, void *buffer)
         	case DASM_IMMSHIFT:
         	  cp[-1] |= (((n >> 2) & 0x7) << 12) | ((n & 0x3) << 6);
         	  break;
-        	case DASM_IMML8: patchimml8:
-        	  cp[-1] |= n >= 0 ? (0x00800000 | (n & 0x0f) | ((n & 0xf0) << 4)) :
-        			     ((-n & 0x0f) | ((-n & 0xf0) << 4));
-        	  break;
-        	case DASM_IMML12: case DASM_IMMV8: patchimml:
-        	  cp[-1] |= n >= 0 ? (0x00800000 | n) : (-n);
-        	  break;
+            // TODO?
+        	// case DASM_IMML8: patchimml8:
+        	//   cp[-1] |= n >= 0 ? (0x00800000 | (n & 0x0f) | ((n & 0xf0) << 4)) :
+        	// 		     ((-n & 0x0f) | ((-n & 0xf0) << 4));
+        	//   break;
+        	// case DASM_IMML12: case DASM_IMMV8: patchimml:
+        	//   cp[-1] |= n >= 0 ? (0x00800000 | n) : (-n);
+        	//   break;
                 }
         } else {
                 *cp++ = ins;

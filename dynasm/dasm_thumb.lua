@@ -92,6 +92,7 @@ end
 local function wputxw(n)
   assert(n >= 0 and n <= 0xffffffff and n % 1 == 0, "word out of range")
   -- TCR_LOG('WROTE ACTION', n)
+  -- TCR_LOG(#actlist, _G.g_lineno)
   actlist[#actlist+1] = n
 end
 
@@ -262,7 +263,7 @@ local map_op = {
   ["asr_3"] = "sdmi:00010iiiiimmmddd",
   ["asr.w_3"] = "sdmi:11101010010s11110iiiddddii10mmmm|sdnm:11111010010snnnn1111dddd0000mmmm",
   ["asr_2"] = "sdm:0100000100mmmddd",
-  ["b_1"] = "B:1101cccciiiiiiii|B:11100iiiiiiiiiii",
+  -- ["b_1"] = "B:1101cccciiiiiiii|B:11100iiiiiiiiiii",
   ["b.w_1"] = "sB:11110scccciiiiii10j0kiiiiiiiiiii|sB:11110siiiiiiiiii10j1kiiiiiiiiiii",
   ["bfc_3"] = "dim:11110011011011110iiiddddii0mmmmm",
   ["bfi_4"] = "dnim:111100110110nnnn0iiiddddii0mmmmm",
@@ -291,7 +292,7 @@ local map_op = {
   ["eor_2"] = "sdm:0100000001mmmddd",
   ["isb_1"] = "y:1111001110111111100011110110oooo",
   ["ldm_2"] = "nr:11001nnnrrrrrrrr",
-  ["ldr_2"] = "tL:01101fffffnnnttt|tL:10011tttffffffff|tL:0101100mmmnnnttt|tB:01001tttffffffff",
+  ["ldr_2"] = "tB:01001tttffffffff|tL:01101fffffnnnttt|tL:10011tttffffffff|tL:0101100mmmnnnttt",
   ["ldr.w_2"] = "tL:111110001101nnnnttttiiiiiiiiiiii|tL:111110000101nnnntttt1PUWiiiiiiii|tL:111110000101nnnntttt000000iimmmm|tB:11111000u1011111ttttiiiiiiiiiiii",
   ["ldr.w_3"] = "tL:111110000101nnnntttt1PUWiiiiiiii",
   ["ldrb_2"] = "tL:01111iiiiinnnttt|tL:0101110mmmnnnttt",
@@ -841,14 +842,15 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
       n = n + 1
 
     elseif p == "B" then
+      -- Don't allow unexpanded conditionals in result code
+      if bits['c'] then
+        werror('invalid conditional')
+      end
+
       local mode, n2, s = parse_label(params[n], false)
       waction("REL_"..mode, n2, s, 1)
       values['u'] = tonumber(n2 >= 10)
       n = n + 1
-
-      if bits['c'] then
-        werror('invalid conditional')
-      end
 
     elseif p == 'c' then
       if params[n] == "le" then
