@@ -816,23 +816,11 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
     --   values['i'] = shr(values[p], 2)
     --   n = n + 1
 
-    elseif p == 'd' then
+    elseif p == 'd' or p == 'n' or p == 'm' or p == 't' or p == 'l' or p == 'h' then
       values[p] = parse_gpr(params[n])
-      n = n + 1
-    elseif p == 'n' then
-      values[p] = parse_gpr(params[n])
-      n = n + 1
-    elseif p == 'm' then
-      values[p] = parse_gpr(params[n])
-      n = n + 1
-    elseif p == 't' then
-      values[p] = parse_gpr(params[n])
-      n = n + 1
-    elseif p == 'l' then
-      values[p] = parse_gpr(params[n])
-      n = n + 1
-    elseif p == 'h' then
-      values[p] = parse_gpr(params[n])
+      if values[p] >= shl(1, bits[p]) then
+        werror('invalid size of register')
+      end
       n = n + 1
 
     elseif p == 'T' then
