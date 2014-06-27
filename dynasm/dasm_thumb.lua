@@ -837,12 +837,13 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
 
       local mode, n2, s = parse_label(params[n], false)
       waction("REL_"..mode, n2, s, 1)
+      values['i'] = shl(14, 17) -- "al" is invalid, so encode it as our override
       values['u'] = tonumber(n2 >= 10)
       n = n + 1
 
     elseif p == 'c' then
-      if params[n] == "le" then
-        values[p] = 0xD
+      if map_cond[params[n]] ~= nil then
+        values[p] = map_cond[params[n]]
         n = n + 1
       else
         werror('invalid conditional')
