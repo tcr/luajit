@@ -250,7 +250,7 @@ local map_op = {
   ["adc.w_3"] = "sdni:11110H01010snnnn0HHHddddHHHHHHHH|sdnmT:11101011010snnnn0iiiddddiiTTmmmm",
   ["adc.w_4"] = "sdnmT:11101011010snnnn0iiiddddiiTTmmmm",
   ["adc_2"] = "sdm:0100000101mmmddd",
-  ["add_3"] = "sdni:0001110iiinnnddd|sdnm:0001100mmmnnnddd|sdpi:10101dddffffffff",
+  ["add_3"] = "sdni:0001110iiinnnddd|sdnm:0001100mmmnnnddd|sdpi:10101dddffffffff|sppi:101100000fffffff",
   ["add_2"] = "sdi:00110dddiiiiiiii|sdm:01000100dmmmmddd|spi:101100000fffffff",
   ["add.w_3"] = "sdni:11110H01000snnnn0HHHddddHHHHHHHH|sdnmT:11101011000snnnn0iiiddddiiTTmmmm",
   ["add.w_4"] = "sdnmT:11101011000snnnn0iiiddddiiTTmmmm",
@@ -745,6 +745,12 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
           werror('immediate operand larger than ' .. bits[p] .. ' bits')
         end
 
+      elseif bits['f'] then
+        values['f'] = parse_imm(imm, bits['f'], shifts['i'], 2, false, instrlen)
+        if values['f'] >= math.pow(2, bits['f']) then
+          werror('immediate operand larger than ' .. bits['f'] .. ' bits')
+        end
+
       elseif bits['H'] then
         -- fun encoding time!
         local val = parse_imm_thumb(imm)
@@ -851,7 +857,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
 
     -- expect literals
     elseif p == 'p' then
-      if params[n] ~= 'sp' then
+      if params[n] ~= 'r13' then
         werror('expecting SP register')
       end
       n = n + 1
@@ -868,6 +874,9 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
 
     elseif p == 'r' then
       values[p] = parse_reglist(params[n])
+      if values[p] > shl(1, bits['r']) then
+        werror('cannot express register list in range.')
+      end
       n = n + 1
 
     elseif p == 'L' then
