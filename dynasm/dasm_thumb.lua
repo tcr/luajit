@@ -832,7 +832,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
     elseif p == 'T' then
       local i, t = parse_shift(params[n], true)
       values['i'] = i
-      values['t'] = t
+      values['T'] = t
       n = n + 1
 
     elseif p == "B" then
