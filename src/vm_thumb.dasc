@@ -176,7 +176,7 @@
 |  ldr OP, [DISPATCH, OP, lsl #2]  // STALL: load OP. early OP.
 |   decode_RA8 RA, INS
 |   add RA, RA, BASE
-|  bx OP
+|  blx OP
 |.endmacro
 |
 |.macro ins_call

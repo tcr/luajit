@@ -96,22 +96,37 @@ static void emit_asm_words(BuildCtx *ctx, uint8_t *p, int n)
 static void emit_asm_wordreloc(BuildCtx *ctx, uint8_t *p, int n,
 			       const char *sym)
 {
+#if LJ_TARGET_ARM
   uint32_t ins;
   emit_asm_words(ctx, p, n-4);
   ins = *(uint32_t *)(p+n-4);
-#if LJ_TARGET_ARM || LJ_TARGET_THUMB
   if ((ins & 0xff000000u) == 0xfa000000u) {
     fprintf(ctx->fp, "\tblx %s\n", sym);
   } else if ((ins & 0x0e000000u) == 0x0a000000u) {
     fprintf(ctx->fp, "\t%s%.2s %s\n", (ins & 0x01000000u) ? "bl" : "b",
 	    &"eqnecsccmiplvsvchilsgeltgtle"[2*(ins >> 28)], sym);
   } else {
-    // fprintf(stderr,
-	   //  "Error: unsupported opcode %08x for %s symbol relocation.\n",
-	   //  ins, sym);
-    // exit(1);
+    fprintf(stderr,
+	    "Error: unsupported opcode %08x for %s symbol relocation.\n",
+	    ins, sym);
+    exit(1);
+  }
+#elif LJ_TARGET_THUMB
+  uint16_t ins;
+  emit_asm_words(ctx, p, n-2);
+  ins = *(uint16_t *)(p+n-2);
+  if ((ins & 0xf000) == 0xd000) {
+    fprintf(ctx->fp, "\tbl %s\n", sym);
+  } else {
+    fprintf(stderr,
+      "Error: unsupported opcode %08x for %s symbol relocation.\n",
+      ins, sym);
+    exit(1);
   }
 #elif LJ_TARGET_PPC || LJ_TARGET_PPCSPE
+  uint32_t ins;
+  emit_asm_words(ctx, p, n-4);
+  ins = *(uint32_t *)(p+n-4);
 #if LJ_TARGET_PS3
 #define TOCPREFIX "."
 #else
