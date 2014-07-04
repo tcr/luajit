@@ -909,6 +909,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
           if not tp then
             werror("expected address operand")
           end
+          values['n'] = d
           waction("IMM", shl(0, 1) + shl(bits['i'] or bits['f'], 6) + shl(shifts['i'] or shifts['f'] or 0, 2) + (bits['f'] and 2 or 0), format(tp.ctypefmt, tailr))
           -- op = op + shl(d, 16) + 0x01000000 + (ext and 0x00400000 or 0)
         end
