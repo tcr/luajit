@@ -517,7 +517,7 @@ int dasm_encode(Dst_DECL, void *buffer) {
           case DASM_ALIGN:
             ins &= 255;
             while ((((char *)cp - base) & ins))
-              *cp++ = 0xe1a00000;
+              *cp++ = 0xbf00;
             // TODO
             break;
           case DASM_REL_LG:
@@ -550,26 +550,31 @@ int dasm_encode(Dst_DECL, void *buffer) {
             } else if ((cp[-2] & 0xf800) == 0xf000) {
               // 11110[1:S][4:cond][6:imm] 10[1:J]0[1:J][11:imm]
               CK((n & 1) == 0 && -1048576 <= n && n <= 1048574, RANGE_REL);
-              if (n < 0) {
-                cp[-2] |= (1 << 10);
-                if (((cp[-2] >> 6) & 0xf) == 14) { // 10 bit, no conditional
-                  cp[-2] |= ((n >> 12) & 0x3ff);
-                } else {
-                  cp[-2] |= ((n >> 12) & 0x3f); // 6 bit
-                }
-                cp[-1] |= (((n >> 1) & 0x000007ff) + 2) |
-                          (n & (1 << 23) ? (1 << 11) : 0) |
-                          (n & (1 << 24) ? (1 << 13) : 0);
-              } else {
-                if (((cp[-2] >> 6) & 0xf) == 14) { // 10 bit, no conditional
-                  cp[-2] |= ((n >> 12) & 0x3ff);
-                } else {
-                  cp[-2] |= ((n >> 12) & 0x3f); // 6 bit
-                }
-                cp[-1] |= (((n >> 1) & 0x000007ff) + 2) |
-                          (n & (1 << 23) ? (1 << 11) : 0) |
-                          (n & (1 << 24) ? (1 << 13) : 0);
+
+              if (cp[-1] & (1 << 12)) { // 10-bit, no conditional
+                cp[-2] &= ~((1 << 10) | 0x3ff);
+              } else { // 6-bit w/ conditional
+                cp[-2] &= ~((1 << 10) | 0x3f);
               }
+              cp[-1] &= ~((1 << 13) | (1 << 11) | 0x7ff);
+
+              uint32_t offset = (n >> 1) + 2;
+              uint32_t S  = (offset & 0x800000) >> 23;
+              uint32_t J1 = (offset & 0x400000) >> 22;
+              uint32_t J2 = (offset & 0x200000) >> 21;
+              if (cp[-1] & (1 << 12)) {
+                J1 = (~J1 & 0x1);
+                J2 = (~J2 & 0x1);
+                J1 ^= S;
+                J2 ^= S;
+              }
+
+              if (cp[-1] & (1 << 12)) { // 10-bit, no conditional
+                cp[-2] |= (S << 10) | ((offset >> 11) & 0x3ff);
+              } else { // 6-bit w/ conditional
+                cp[-2] |= (S << 10) | ((offset >> 11) & 0x3f);
+              }
+              cp[-1] |= (J1 << 13) | (J2 << 11) | (offset & 0x7ff);
               // goto patchimml;
             } else {
               printf("Invalid branch opcode (%x) %x at %d\n", cp[-2], cp[-1],

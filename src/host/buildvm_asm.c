@@ -115,13 +115,14 @@ static void emit_asm_wordreloc(BuildCtx *ctx, uint8_t *p, int n,
   uint16_t ins;
   emit_asm_words(ctx, p, n-2);
   ins = *(uint16_t *)(p+n-2);
-  if ((ins & 0xf000) == 0xd000) {
+  if (1) {
     fprintf(ctx->fp, "\tbl %s\n", sym);
   } else {
+    printf("accually %x\n", *(uint32_t *)(p+n-4));
     fprintf(stderr,
       "Error: unsupported opcode %08x for %s symbol relocation.\n",
       ins, sym);
-    exit(1);
+    // exit(1);
   }
 #elif LJ_TARGET_PPC || LJ_TARGET_PPCSPE
   uint32_t ins;

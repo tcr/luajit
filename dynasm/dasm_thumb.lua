@@ -843,7 +843,6 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
 
       local mode, n2, s = parse_label(params[n], false)
       waction("REL_"..mode, n2, s, 1)
-      values['i'] = shl(14, 17) -- "al" is invalid, so encode it as our override
       values['u'] = tonumber(n2 >= 10)
       n = n + 1
 
