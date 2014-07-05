@@ -371,7 +371,7 @@ local map_op = {
   ["smlal_4"] = "lhnm:111110111100nnnnllllhhhh0000mmmm",
   ["smull_4"] = "lhnm:111110111000nnnnllllhhhh0000mmmm",
   ["ssat_3"] = "dknf:1111001100f0nnnn0iiiddddii0kkkkk",
-  ["str_2"] = "tL:01100fffffnnnttt|tL:10010tttffffffff|tL:0101000mmmnnnttt",
+  ["str_2"] = "tL:10010tttffffffff|tL:01100fffffnnnttt|tL:0101000mmmnnnttt",
   ["str.w_2"] = "tL:111110001100nnnnttttiiiiiiiiiiii|tL:111110000100nnnntttt1PUWiiiiiiii|tL:111110000100nnnntttt000000iimmmm",
   ["str.w_3"] = "tL:111110000100nnnntttt1PUWiiiiiiii",
   ["strb_2"] = "tL:01110iiiiinnnttt|tL:0101010mmmnnnttt",
@@ -635,7 +635,8 @@ end
 
 local function parse_imm_shift(imm)
   imm = match(imm, "^#(.*)$")
-  if n then
+  local n = tonumber(imm)
+  if n ~= nil then
     if n >= 0 and n < 32 then
       return band(n)
     end
@@ -945,7 +946,13 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
           else
             local m, neg = parse_gpr_pm(p2)
             values['U'] = tonumber(not neg)
-            if p3 then values['i'] = parse_shift(p3) end
+            if p3 then
+              if bits['i'] ~= 2 then
+                -- TODO: make this a different tag than i
+                werror('no shift position available')
+              end
+              values['i'] = parse_shift(p3)
+            end
             -- if ldrd and (m == d or m-1 == d) then werror("register conflict") end
           end
 
@@ -959,6 +966,9 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
 
           local p1a, p2 = match(p1, "^([^,%s]*)%s*(.*)$")
           values['n'] = parse_gpr(p1a)
+          if not bits['n'] and values['n'] ~= 13 then
+            werror('only stack register is encoded implicitly')
+          end
           if p2 ~= "" then
             local imm = match(p2, "^,%s*#(.*)$")
             if imm then
@@ -985,8 +995,15 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
               local m, neg = parse_gpr_pm(p2a)
               -- if ldrd and (m == d or m-1 == d) then werror("register conflict") end
               values['U'] = tonumber(not neg)
+              if m ~= nil then
+                values['m'] = m
+              end
               if p3 ~= "" then
                 if ext then werror("too many parameters") end
+                if bits['i'] ~= 2 then
+                  -- TODO: make this a different tag than i
+                  werror('no shift position available')
+                end
                 values['i'] = parse_shift(p3)
               end
             end
