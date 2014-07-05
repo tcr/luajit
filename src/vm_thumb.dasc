@@ -176,6 +176,7 @@
 |  ldr OP, [DISPATCH, OP, lsl #2]  // STALL: load OP. early OP.
 |   decode_RA8 RA, INS
 |   add RA, RA, BASE
+|   add OP, OP, #1 // link thumb
 |  bx OP
 |.endmacro
 |
