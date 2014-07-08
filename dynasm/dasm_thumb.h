@@ -167,8 +167,8 @@ void dasm_setup(Dst_DECL, const void *actionlist) {
       D->status = DASM_S_##st | (p - D->actionlist - 1);                       \
       if (D->status != DASM_S_OK) {                                            \
         fprintf(stderr,                                                        \
-                "CK ERROR: line %d (n %x ins %x) start %d offset %d\n",        \
-                __LINE__, n, ins, start, p - (D->actionlist + start));         \
+                "CK ERROR: line %d (n %x ins %x) start %d arg (%d)\n",         \
+                __LINE__, n, ins, start, ap_count);                            \
       }                                                                        \
       return;                                                                  \
     }                                                                          \
@@ -238,6 +238,7 @@ static uint16_t dasm_immthumb(unsigned int val) {
 /* Pass 1: Store actions and args, link branches/labels, estimate offsets. */
 void dasm_put(Dst_DECL, int start, ...) {
   va_list ap;
+  int ap_count = 0;
   dasm_State *D = Dst_REF;
   dasm_ActList p = D->actionlist + start;
   dasm_Section *sec = D->section;
@@ -270,6 +271,9 @@ void dasm_put(Dst_DECL, int start, ...) {
     } else {
       ins = *p++;
       unsigned int action = (ins >> 12);
+      if (action >= DASM_REL_PC) {
+        ap_count += 1;
+      }
       int *pl, n = action >= DASM_REL_PC ? va_arg(ap, int) : 0;
       switch (action) {
       case DASM_STOP:
