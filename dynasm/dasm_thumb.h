@@ -31,10 +31,9 @@ enum {
   DASM_LABEL_PC,
   DASM_IMM,
   DASM_IMMTHUMB,
+  DASM_IMMLONG,
   DASM_IMMSHIFT,
-  /* unused */ DASM_IMML8,
-  DASM_IMML12,
-  DASM_IMMV8,
+  /* Finished. */
   DASM__MAX
 };
 
@@ -353,18 +352,14 @@ void dasm_put(Dst_DECL, int start, ...) {
 #endif
         b[pos++] = n;
         break;
-      case DASM_IMMV8:
-        CK((n & 3) == 0, RANGE_I);
-        n >>= 2;
-      case DASM_IMML8:
-      case DASM_IMML12:
-        CK(n >= 0 ? ((n >> ((ins >> 5) & 31)) == 0)
-                  : (((-n) >> ((ins >> 5) & 31)) == 0),
-           RANGE_I);
-        b[pos++] = n;
-        break;
       case DASM_IMMSHIFT:
         CK(n >= 0 && n < 32, RANGE_I);
+        b[pos++] = n;
+        break;
+      case DASM_IMMLONG:
+        // TODO IMM13
+        CK(n > 0, RANGE_I);
+        // CK(dasm_immthumb((unsigned int)n) != -1, RANGE_I);
         b[pos++] = n;
         break;
       case DASM_IMMTHUMB:
@@ -450,10 +445,8 @@ int dasm_link(Dst_DECL, size_t *szp) {
             break;
           case DASM_IMM:
           case DASM_IMMTHUMB:
+          case DASM_IMMLONG:
           case DASM_IMMSHIFT:
-          case DASM_IMML8:
-          case DASM_IMML12:
-          case DASM_IMMV8:
             pos++;
             break;
           }
@@ -594,6 +587,11 @@ int dasm_encode(Dst_DECL, void *buffer) {
                        ((1 << (DASM_IMM_BITS(ins))) - 1))
                       << (DASM_IMM_SHIFT(ins));
             break;
+          case DASM_IMMLONG:
+            cp[-2] |= ((n >> 11) & 0x1) << 10;
+            cp[-1] |= ((n >> 8) & 0x7) << 12;
+            cp[-1] |= n & 0xFF;
+            break;
           case DASM_IMMTHUMB:
             thumbexp = dasm_immthumb((unsigned int)n);
             cp[-2] |= ((thumbexp >> 11) & 0x1) << 10;
@@ -603,15 +601,6 @@ int dasm_encode(Dst_DECL, void *buffer) {
           case DASM_IMMSHIFT:
             cp[-1] |= (((n >> 2) & 0x7) << 12) | ((n & 0x3) << 6);
             break;
-            // TODO?
-            // case DASM_IMML8: patchimml8:
-            //   cp[-1] |= n >= 0 ? (0x00800000 | (n & 0x0f) | ((n & 0xf0) <<
-            // 4)) :
-            // 		     ((-n & 0x0f) | ((-n & 0xf0) << 4));
-            //   break;
-            // case DASM_IMML12: case DASM_IMMV8: patchimml:
-            //   cp[-1] |= n >= 0 ? (0x00800000 | n) : (-n);
-            //   break;
           }
         } else {
           *cp++ = ins;

@@ -39,8 +39,7 @@ local wline, werror, wfatal, wwarn
 local action_names = {
   "STOP", "SECTION", "ESC", "REL_EXT",
   "ALIGN", "REL_LG", "LABEL_LG",
-  "REL_PC", "LABEL_PC", "IMM", "IMMTHUMB", "IMMSHIFT",
-  --[[unused]] "IMML8", "IMML12", "IMMV8",
+  "REL_PC", "LABEL_PC", "IMM", "IMMTHUMB", "IMMLONG", "IMMSHIFT"
 }
 
 -- Maximum number of section buffer positions for dasm_put().
@@ -254,7 +253,7 @@ local map_op = {
   ["add_2"] = "sdi:00110dddiiiiiiii|sdm:01000100dmmmmddd|spi:101100000fffffff",
   ["add.w_3"] = "sdni:11110H01000snnnn0HHHddddHHHHHHHH|sdnmT:11101011000snnnn0iiiddddiiTTmmmm",
   ["add.w_4"] = "sdnmT:11101011000snnnn0iiiddddiiTTmmmm",
-  ["addw_3"] = "dni:11110H100000nnnn0HHHddddHHHHHHHH",
+  ["addw_3"] = "dnM:11110M100000nnnn0MMMddddMMMMMMMM",
   ["adr_2"] = "dB:10100dddffffffff",
   ["adr.w_2"] = "dB:11110H10101011110HHHddddHHHHHHHH|dB:11110H10000011110HHHddddHHHHHHHH",
   ["and.w_3"] = "sdni:11110H00000snnnn0HHHddddHHHHHHHH|sdnmT:11101010000snnnn0iiiddddiiTTmmmm",
@@ -633,6 +632,16 @@ local function parse_imm_thumb(imm)
   end
 end
 
+local function parse_imm_long(imm)
+  local n = tonumber(imm)
+  if n then
+    return band(n)
+  else
+    waction("IMMLONG", 0, imm)
+    return 0
+  end
+end
+
 local function parse_imm_shift(imm)
   imm = match(imm, "^#(.*)$")
   local n = tonumber(imm)
@@ -732,6 +741,18 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
     local p = templatestr:sub(pidx, pidx)
 
     -- TCR_LOG('match ' .. p .. ' against ' .. tostring(params[n]) .. ' in ' .. templatestr .. ' ' .. templatestr)
+    
+    if p == 'M' then
+      local imm = match(params[n], "^#(.*)$")
+      if not imm then
+        werror('bad immediate (M) operand')
+      end
+
+      values[p] = parse_imm_long(imm)
+      if values[p] >= math.pow(2, bits[p]) then
+        werror('immediate operand larger than ' .. bits[p] .. ' bits')
+      end
+    end
 
     -- Immediate values
     if p == 'i' then
