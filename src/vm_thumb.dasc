@@ -176,7 +176,6 @@
 |  ldr OP, [DISPATCH, OP, lsl #2]  // STALL: load OP. early OP.
 |   decode_RA8 RA, INS
 |   add RA, RA, BASE
-|   add OP, OP, #1 // link thumb
 |  bx OP
 |.endmacro
 |
@@ -4340,11 +4339,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  add RA, RA, RC
     |   str LFUNC:CARG3, [CARG4]	// Store copy of LFUNC.
     |   add CARG2, RC, #8+FRAME_VARG
-    |    ldr KBASE, [PC, #-4+PC2PROTO(k)]
+    |    ldr KBASE, [PC, #44]
     |  cmp RA, CARG1
     |   str CARG2, [CARG4, #4]		// Store delta + FRAME_VARG.
     |  bhs ->vm_growstack_l
-    |  ldrb RB, [PC, #-4+PC2PROTO(numparams)]
+    |  ldrb RB, [PC, #54]
     |   mov RA, BASE
     |   mov RC, CARG4
     |  cmp RB, #0
