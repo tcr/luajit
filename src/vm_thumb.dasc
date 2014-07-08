@@ -4373,7 +4373,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       |  ldr CARG4, [DISPATCH, #DISPATCH_GL(wrapf)]
     }
     |   add CARG2, RA, NARGS8:RC
-    |   ldr CARG1, [r8, #24]
+    |   ldr CARG1, L->maxstack
     |  add RC, BASE, NARGS8:RC
     |    str BASE, L->base
     |   cmp CARG2, CARG1
