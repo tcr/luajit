@@ -475,7 +475,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  sub PC, PC, RB			// PC = frame delta + frame type
   |    mv_vmstate CARG2, INTERP
   |   sub NARGS8:RC, CARG1, BASE
-  |    st_vmstate CARG2
+  |    str CARG2, [DISPATCH, #-127]
   |
   |->vm_call_dispatch:
   |  // RB = old base, BASE = new base, RC = nargs*8, PC = caller PC
