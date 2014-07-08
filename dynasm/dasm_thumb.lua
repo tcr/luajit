@@ -291,7 +291,7 @@ local map_op = {
   ["eor_2"] = "sdm:0100000001mmmddd",
   ["isb_1"] = "y:1111001110111111100011110110oooo",
   ["ldm_2"] = "nr:11001nnnrrrrrrrr",
-  ["ldr_2"] = "tB:01001tttffffffff|tL:01101fffffnnnttt|tL:10011tttffffffff|tL:0101100mmmnnnttt",
+  ["ldr_2"] = "tB:01001tttffffffff|tI:01101fffffnnnttt|tI:10011tttffffffff|tI:0101100mmmnnnttt",
   ["ldr.w_2"] = "tL:111110001101nnnnttttiiiiiiiiiiii|tL:111110000101nnnntttt1PUWiiiiiiii|tL:111110000101nnnntttt000000iimmmm|tB:11111000u1011111ttttiiiiiiiiiiii",
   ["ldr.w_3"] = "tL:111110000101nnnntttt1PUWiiiiiiii",
   ["ldrb_2"] = "tL:01111iiiiinnnttt|tL:0101110mmmnnnttt",
@@ -900,7 +900,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
       end
       n = n + 1
 
-    elseif p == 'L' then
+    elseif p == 'L' or p == 'I' then
 
       local pn = params[n]
       local p1, wb = match(pn, "^%[%s*(.-)%s*%](!?)$")
@@ -914,6 +914,10 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
 
       -- no bracketed operands, check for extern or define
       if not p1 then
+        if p == 'I' then
+          werror('cannot include dynamic value')
+        end
+
         if p2 then
           werror("expected address operand")
         end
