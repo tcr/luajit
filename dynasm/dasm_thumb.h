@@ -583,6 +583,15 @@ int dasm_encode(Dst_DECL, void *buffer) {
           case DASM_LABEL_PC:
             break;
           case DASM_IMM:
+            // 'U' in PUW
+            if (DASM_IMM_SIGNED(ins)) {
+              if (n < 0) {
+                n = -n;
+              } else {
+                cp[-1] |= 1 << 9;
+              }
+            }
+
             cp[-1] |= ((n >> (DASM_IMM_SCALE(ins))) &
                        ((1 << (DASM_IMM_BITS(ins))) - 1))
                       << (DASM_IMM_SHIFT(ins));

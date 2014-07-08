@@ -101,7 +101,6 @@ local function waction(action, val, a, num)
   local w = assert(map_action[action], "bad action name `"..action.."'")
   wputxw(0xffff)
   wputxw(w + (val or 0))
-  if (val == 300) then TCR_LOG('WERAWERAWERWERWER'); end
   if a then actargs[#actargs+1] = a end
   if a or num then secpos = secpos + (num or 1) end
 end
@@ -571,26 +570,36 @@ local function parse_reglist(reglist)
   return rr
 end
 
-local function parse_imm(imm, bits, shift, scale, signed, instrlen)
+local function parse_imm(imm, bits, shift, scale, puw, instrlen)
   -- bits: bits available
   -- shift: bits to shift left in value (useless except in waction)
   -- scale: value shifted left by how much?
-  -- signed: is value signed or unsigned?
+  -- puw: does this value fit the puw format?
 
   -- imm = match(imm, "^#(.*)$")
+  local U = 1
+
   if not imm then werror("expected immediate operand") end
   local n = tonumber(imm)
   if n then
+    if n < 0 then
+      if not puw then
+        werror('invalid signed immediate')
+      end
+      U = 0
+      n = -n
+    end
+
     local m = sar(n, scale)
     if shl(m, scale) == n then
       -- scale is correct?
-      if signed then
+      if puw then
         local s = sar(m, bits-1)
-        if s == 0 then return m
-        elseif s == -1 then return m + shl(1, bits) end
+        if s == 0 then return m, U
+        elseif s == -1 then return m + shl(1, bits), U end
       else
         -- if value fits in range...
-        if sar(m, bits) == 0 then return m end
+        if sar(m, bits) == 0 then return m, U end
       end
     end
     werror("out of range immediate `"..imm.."'")
@@ -606,11 +615,13 @@ local function parse_imm(imm, bits, shift, scale, signed, instrlen)
     if shift > 15 then werror('IMM shift too big: ' .. shift) end
     if bits > 31 then werror('IMM bits too big: ' .. bits) end
     if scale > 3 then werror('IMM scale too big: ' .. scale) end
+
+    -- TODO why this
     if imm ~= 'GG_DISP2STATIC' then
-      if not signed then werror('IMM must be signed') end
+      if not puw then werror('IMM must be signed') end
     end
-    waction("IMM", (signed and shl(1, 11) or 0) + shl(bits + 1, 6) + shl(shift, 2) + scale, imm)
-    return 0
+    waction("IMM", (puw and shl(1, 11) or 0) + shl(bits, 6) + shl(shift, 2) + scale, imm)
+    return 0, 0
   end
 end
 
@@ -742,6 +753,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
 
     -- TCR_LOG('match ' .. p .. ' against ' .. tostring(params[n]) .. ' in ' .. templatestr .. ' ' .. templatestr)
     
+    -- imm13
     if p == 'M' then
       local imm = match(params[n], "^#(.*)$")
       if not imm then
@@ -814,36 +826,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
       end
       n = n + 1
 
-    -- unused?
-    -- elseif p == 'U' then
-    --   local imm = match(params[n], "^#(.*)$")
-    --   if imm then
-    --     local val = parse_imm_load(imm, bits['U'] or bits['i'])
-    --     if val >= math.pow(2, bits[p]) then
-    --       werror('signed immediate operand larger than ' .. bits[p] .. ' bits')
-    --     end
-    --     values['i'] = math.abs(val)
-    --     values['U'] = tonumber(val >= 0)
-    --   else
-    --     werror('bad signed immediate operand')
-    --   end
-    --   n = n + 1
-
-    -- Immediate values with lower two bits empty
-    -- elseif p == 'f' then
-    --   local imm = match(params[n], "^#(.*)$")
-    --   if imm then
-    --     -- shift is FALSE
-    --     values[p] = parse_imm(imm, bits['i'], 0, 2, true)
-    --   else
-    --     werror('bad immediate operand')
-    --   end
-    --   if values[p] % 4 ~= 0 then
-    --     werror('lower two bits of immediate value not empty')
-    --   end
-    --   values['i'] = shr(values[p], 2)
-    --   n = n + 1
-
+    -- Registers
     elseif p == 'd' or p == 'n' or p == 'm' or p == 't' or p == 'l' or p == 'h' then
       values[p] = parse_gpr(params[n])
       if values[p] >= shl(1, bits[p]) then
@@ -851,12 +834,14 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
       end
       n = n + 1
 
+    -- Shift
     elseif p == 'T' then
       local i, t = parse_shift(params[n], true)
       values['i'] = i
       values['T'] = t
       n = n + 1
 
+    -- Branches
     elseif p == "B" then
       -- Don't allow unexpanded conditionals in result code
       if bits['c'] then
@@ -907,12 +892,12 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
       local p2 = params[n+1]
 
       values['P'] = 0
-      values['U'] = 1
+      values['U'] = 0
       values['W'] = 0
       local ldrd = false
       local ext = bits['i'] == 8
 
-      -- no bracketed operands, check for extern or define
+      -- extern or define (no bracketed operands )
       if not p1 then
         if p == 'I' then
           werror('cannot include dynamic value')
@@ -935,17 +920,17 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
             werror("expected address operand")
           end
           values['n'] = d
-          waction("IMM", shl(0, 1) + shl(bits['i'] or bits['f'], 6) + shl(shifts['i'] or shifts['f'] or 0, 2) + (bits['f'] and 2 or 0), format(tp.ctypefmt, tailr))
+          waction("IMM", shl(tonumber(bits['U']) and 1 or 0, 11) + shl(bits['i'] or bits['f'], 6) + shl(shifts['i'] or shifts['f'] or 0, 2) + (bits['f'] and 2 or 0), format(tp.ctypefmt, tailr))
           -- op = op + shl(d, 16) + 0x01000000 + (ext and 0x00400000 or 0)
         end
 
         n = n + 1
       else
 
-        -- Bracketed operands with operand following (i.e. [r4]!, #5)
+        -- Bracketed operands with operand following arg (i.e. [r4]!, #5)
         if p2 then
           values['P'] = 0
-          values['U'] = 1
+          values['U'] = 0
           values['W'] = 1
 
           if wb == "!" then werror("bad use of '!'") end
@@ -959,17 +944,10 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
           local imm = match(p2, "^#(.*)$")
           if imm then
             if p3 then werror("too many parameters") end
-            if match(imm, "^%-(.*)$") then
-              if not bits['U'] then
-                werror('invalid signed immediate')
-              end
-              imm = sub(imm, 2)
-              values['U'] = 0
-            end
             if bits['i'] then
-              values['i'] = parse_imm(imm, bits['i'], shifts['i'], 0, bits['U'], instrlen)
+              values['i'], values['U'] = parse_imm(imm, bits['i'], shifts['i'], 0, bits['U'], instrlen)
             elseif bits['f'] then
-              values['f'] = parse_imm(imm, bits['f'], shifts['f'], 2, bits['U'], instrlen)
+              values['f'], values['U'] = parse_imm(imm, bits['f'], shifts['f'], 2, bits['U'], instrlen)
             else
               werror('immediate not supported')
             end
@@ -988,7 +966,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
 
           n = n + 2
 
-        -- Bracketed operands alone
+        -- Bracketed operands (i.e. [r4, #imm])
         else
           values['P'] = 1
           values['U'] = 1
@@ -1006,19 +984,11 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
           if p2 ~= "" then
             local imm = match(p2, "^,%s*#(.*)$")
             if imm then
-              if match(imm, "^%-(.*)$") then
-                if not bits['U'] then
-                  werror('invalid signed immediate')
-                end
-                imm = sub(imm, 2)
-                values['U'] = 0
-              end
-
-            -- TCR_LOG('bits', bits['i'], bits['f'])
+              -- TCR_LOG('bits', bits['i'], bits['f'])
               if bits['i'] then
-                values['i'] = parse_imm(imm, bits['i'], shifts['i'], 0, bits['U'], instrlen)
+                values['i'], values['U'] = parse_imm(imm, bits['i'], shifts['i'], 0, bits['U'], instrlen)
               elseif bits['f'] then
-                values['f'] = parse_imm(imm, bits['f'], shifts['f'], 2, bits['U'], instrlen)
+                values['f'], values['U'] = parse_imm(imm, bits['f'], shifts['f'], 2, bits['U'], instrlen)
               else
                 werror('immediate not supported')
               end
@@ -1073,8 +1043,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
     --   n = n + 1
 
     else
-      TCR_LOG('UNKNOWN PATTERN:', p)
-      assert(false)
+      werror('unknown pattern lookup: ' .. p)
     end
 
     pidx = pidx + 1
