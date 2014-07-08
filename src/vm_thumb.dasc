@@ -474,7 +474,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  sub PC, PC, RB			// PC = frame delta + frame type
   |    mv_vmstate CARG2, INTERP
   |   sub NARGS8:RC, CARG1, BASE
-  |    str CARG2, [DISPATCH, #-127]
+  |    st_vmstate CARG2
   |
   |->vm_call_dispatch:
   |  // RB = old base, BASE = new base, RC = nargs*8, PC = caller PC
@@ -4339,11 +4339,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  add RA, RA, RC
     |   str LFUNC:CARG3, [CARG4]	// Store copy of LFUNC.
     |   add CARG2, RC, #8+FRAME_VARG
-    |    ldr KBASE, [PC, #44]
+    |    ldr KBASE, [PC, #-4+PC2PROTO(k)]
     |  cmp RA, CARG1
     |   str CARG2, [CARG4, #4]		// Store delta + FRAME_VARG.
     |  bhs ->vm_growstack_l
-    |  ldrb RB, [PC, #54]
+    |  ldrb RB, [PC, #-4+PC2PROTO(numparams)]
     |   mov RA, BASE
     |   mov RC, CARG4
     |  cmp RB, #0
