@@ -464,7 +464,7 @@ static void build_subroutines(BuildCtx *ctx)
   |    ldr DISPATCH, L->glref		// Setup pointer to dispatch table.
   |   str CARG1, SAVE_PC		// Any value outside of bytecode is ok.
   |  str RC, SAVE_CFRAME
-  |    add DISPATCH, DISPATCH, #GG_G2DISP
+  |    addw DISPATCH, DISPATCH, #GG_G2DISP
   |
   |3:  // Entry point for vm_cpcall/vm_resume (BASE = base, PC = ftype).
   |  ldr RB, L->base			// RB = old base (for vmeta_call).
