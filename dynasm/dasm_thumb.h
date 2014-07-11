@@ -230,10 +230,10 @@ static uint16_t dasm_immthumb(unsigned int val) {
   return (ABCDE << 7) | (val & 0x7F);
 }
 
-#define DASM_IMM_SIGNED(x) ((x >> 11) & 0x1)
-#define DASM_IMM_BITS(x) ((x >> 6) & ((1 << 5) - 1))
-#define DASM_IMM_SHIFT(x) ((x >> 2) & ((1 << 4) - 1))
-#define DASM_IMM_SCALE(x) ((x >> 0) & ((1 << 2) - 1))
+#define DASM_IMM_SIGNED(x) ((x >> 10) & ((1 << 2) - 1))
+#define DASM_IMM_BITS(x) ((x >> 5) & ((1 << 5) - 1))
+#define DASM_IMM_SHIFT(x) ((x >> 1) & ((1 << 4) - 1))
+#define DASM_IMM_SCALE(x) ((x >> 0) & 0x1 ? 2 : 0)
 
 /* Pass 1: Store actions and args, link branches/labels, estimate offsets. */
 void dasm_put(Dst_DECL, int start, ...) {
@@ -592,7 +592,11 @@ int dasm_encode(Dst_DECL, void *buffer) {
               if (n < 0) {
                 n = -n;
               } else {
-                cp[-1] |= 1 << 9;
+                if (DASM_IMM_SIGNED(ins) == 2) {
+                  cp[-2] |= 1 << 7;
+                } else if (DASM_IMM_SIGNED(ins) == 1) {
+                  cp[-1] |= 1 << 9;
+                }
               }
             }
 
