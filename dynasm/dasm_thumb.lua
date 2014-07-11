@@ -583,7 +583,7 @@ local function parse_imm(imm, bits, shift, scale, puw, instrlen)
   local n = tonumber(imm)
   if n then
     if n < 0 then
-      if not puw then
+      if not puw or puw == 0 then
         werror('invalid signed immediate')
       end
       U = 0
@@ -593,7 +593,7 @@ local function parse_imm(imm, bits, shift, scale, puw, instrlen)
     local m = sar(n, scale)
     if shl(m, scale) == n then
       -- scale is correct?
-      if puw then
+      if puw and puw > 0 then
         local s = sar(m, bits-1)
         if s == 0 then return m, U
         elseif s == -1 then return m + shl(1, bits), U end
@@ -610,7 +610,7 @@ local function parse_imm(imm, bits, shift, scale, puw, instrlen)
     -- end
 
     -- 000000000000 - 12 bits
-    -- signed:1, bits:5, shift:4, scale:2
+    -- signed:2, bits:5, shift:4, scale:1
     -- if instrlen == 1 then werror('IMM required to be word-length') end
     if shift > 15 then werror('IMM shift too big: ' .. shift) end
     if bits > 31 then werror('IMM bits too big: ' .. bits) end
@@ -618,9 +618,9 @@ local function parse_imm(imm, bits, shift, scale, puw, instrlen)
 
     -- TODO why this
     if imm ~= 'GG_DISP2STATIC' then
-      if not puw then werror('IMM must be signed') end
+      if not puw or puw == 0 then werror('IMM must be signed') end
     end
-    waction("IMM", (puw and shl(1, 11) or 0) + shl(bits, 6) + shl(shift, 2) + scale, imm)
+    waction("IMM", shl(puw == 7 and 2 or (puw == 9 and 1 or 0), 10) + shl(bits, 5) + shl(shift, 1) + (scale == 2 and 1 or 0), imm)
     return 0, 0
   end
 end
@@ -774,13 +774,13 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
       end
 
       if bits['i'] then
-        values[p] = parse_imm(imm, bits['i'], shifts['i'], 0, false, instrlen)
+        values[p] = parse_imm(imm, bits['i'], shifts['i'], 0, 0, instrlen)
         if values[p] >= math.pow(2, bits[p]) then
           werror('immediate operand larger than ' .. bits[p] .. ' bits')
         end
 
       elseif bits['f'] then
-        values['f'] = parse_imm(imm, bits['f'], shifts['i'], 2, false, instrlen)
+        values['f'] = parse_imm(imm, bits['f'], shifts['i'], 2, 0, instrlen)
         if values['f'] >= math.pow(2, bits['f']) then
           werror('immediate operand larger than ' .. bits['f'] .. ' bits')
         end
@@ -920,7 +920,9 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
             werror("expected address operand")
           end
           values['n'] = d
-          waction("IMM", shl(tonumber(bits['U']) and 1 or 0, 11) + shl(bits['i'] or bits['f'], 6) + shl(shifts['i'] or shifts['f'] or 0, 2) + (bits['f'] and 2 or 0), format(tp.ctypefmt, tailr))
+
+          values['P'] = 1
+          waction("IMM", shl(tonumber(shifts['U']) == 7 and 2 or (tonumber(shifts['U']) == 9 and 1 or 0), 10) + shl(bits['i'] or bits['f'], 5) + shl(shifts['i'] or shifts['f'] or 0, 1) + (bits['f'] and 1 or 0), format(tp.ctypefmt, tailr))
           -- op = op + shl(d, 16) + 0x01000000 + (ext and 0x00400000 or 0)
         end
 
@@ -945,9 +947,9 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
           if imm then
             if p3 then werror("too many parameters") end
             if bits['i'] then
-              values['i'], values['U'] = parse_imm(imm, bits['i'], shifts['i'], 0, bits['U'], instrlen)
+              values['i'], values['U'] = parse_imm(imm, bits['i'], shifts['i'], 0, tonumber(shifts['U']), instrlen)
             elseif bits['f'] then
-              values['f'], values['U'] = parse_imm(imm, bits['f'], shifts['f'], 2, bits['U'], instrlen)
+              values['f'], values['U'] = parse_imm(imm, bits['f'], shifts['f'], 2, tonumber(shifts['U']), instrlen)
             else
               werror('immediate not supported')
             end
@@ -986,9 +988,9 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
             if imm then
               -- TCR_LOG('bits', bits['i'], bits['f'])
               if bits['i'] then
-                values['i'], values['U'] = parse_imm(imm, bits['i'], shifts['i'], 0, bits['U'], instrlen)
+                values['i'], values['U'] = parse_imm(imm, bits['i'], shifts['i'], 0, tonumber(shifts['U']), instrlen)
               elseif bits['f'] then
-                values['f'], values['U'] = parse_imm(imm, bits['f'], shifts['f'], 2, bits['U'], instrlen)
+                values['f'], values['U'] = parse_imm(imm, bits['f'], shifts['f'], 2, tonumber(shifts['U']), instrlen)
               else
                 werror('immediate not supported')
               end
