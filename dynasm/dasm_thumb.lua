@@ -301,7 +301,7 @@ local map_op = {
   ["ldrexb_2"] = "tL:111010001101nnnntttt111101001111",
   ["ldrexh_2"] = "tL:111010001101nnnntttt111101011111",
   ["ldrd_4"] = "tdL:1110100PU1W1nnnnttttddddffffffff",
-  ["ldrd_3"] = "tdLi:1110100PU1W1nnnnttttddddffffffff|tdB:1110100PU1W11111ttttddddiiiiiiii",
+  ["ldrd_3"] = "tdL:1110100PU1W1nnnnttttddddffffffff|tdB:1110100PU1W11111ttttddddiiiiiiii",
   ["ldrh_2"] = "tL:10001iiiiinnnttt|tL:0101101mmmnnnttt",
   ["ldrh_3"] = "tL:10001iiiiinnnttt|tL:0101101mmmnnnttt",
   ["ldrh.w_3"] = "tL:111110001011nnnnttttiiiiiiiiiiii|tL:111110000011nnnntttt1PUWiiiiiiii|tL:111110000011nnnntttt000000iimmmm",
@@ -972,7 +972,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
         else
           values['P'] = 1
           values['U'] = 1
-          values['W'] = tonumber(wb == "!")
+          values['W'] = tonumber(wb == "!" and 1 or 0)
 
           local p1a, p2 = match(p1, "^([^,%s]*)%s*(.*)$")
           values['n'] = parse_gpr(p1a)
@@ -1001,9 +1001,12 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
               local m, neg = parse_gpr_pm(p2a)
               -- if ldrd and (m == d or m-1 == d) then werror("register conflict") end
               values['U'] = tonumber(not neg)
-              if m ~= nil then
+              if m ~= nil and bits['m'] then
                 values['m'] = m
+              else
+                werror('cannot use register as index')
               end
+
               if p3 ~= "" then
                 if ext then werror("too many parameters") end
                 if bits['i'] ~= 2 then
