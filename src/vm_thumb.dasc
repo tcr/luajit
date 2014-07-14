@@ -15,6 +15,63 @@
 |
 |//-----------------------------------------------------------------------
 |
+|.macro ldrd_i, rt, rt2, rn, rm
+|  add rt, rn, rm
+|  ldm rt, {rt, rt2}
+|.endmacro
+|.macro ldrd_iw, rt, rt2, rn, rm
+|  add rn, rn, rm
+|  ldrd rt, rt2, [rn]
+|.endmacro
+|.macro ldrd_w, rt, rt2, rn, rm
+|  ldrd rt, rt2, [rn]
+|  add rn, rn, rm
+|.endmacro
+|
+|.macro ldrdlo_i, rt, rt2, rn, rm
+|  itt lo
+|  addlo rt, rn, rm
+|  ldmlo rt, {rt, rt2}
+|.endmacro
+|.macro ldrdlo_iw, rt, rt2, rn, rm
+|  itt lo
+|  addlo rn, rn, rm
+|  ldrdlo rt, rt2, [rn]
+|.endmacro
+|
+|.macro strd_i, rt, rt2, rn, rm
+|  add rn, rn, rm
+|  strd rt, rt2, [rn]
+|  sub rn, rn, rm
+|.endmacro
+|.macro strd_iw, rt, rt2, rn, rm
+|  add rn, rn, rm
+|  strd rt, rt2, [rn]
+|.endmacro
+|.macro strd_w, rt, rt2, rn, rm
+|  strd rt, rt2, [rn]
+|  add rn, rn, rm
+|.endmacro
+|
+|.macro strdne_i, rt, rt2, rn, rm
+|  ittt ne
+|  addne rn, rn, rm
+|  strdne rt, rt2, [rn]
+|  subne rn, rn, rm
+|.endmacro
+|.macro strdls_i, rt, rt2, rn, rm
+|  ittt ls
+|  addls rn, rn, rm
+|  strdls rt, rt2, [rn]
+|  subls rn, rn, rm
+|.endmacro
+|.macro strdhi_i, rt, rt2, rn, rm
+|  ittt hi
+|  addhi rn, rn, rm
+|  strdhi rt, rt2, [rn]
+|  subhi rn, rn, rm
+|.endmacro
+|
 |// Fixed register assignments for the interpreter.
 |
 |// The following must be C callee-save.
@@ -557,7 +614,8 @@ static void build_subroutines(BuildCtx *ctx)
   |   strdne CARG3, CARG4, [CARG2]
   |   movne CARG3, CARG1
   |  bne ->BC_CAT_Z
-  |   strd CARG3, CARG4, [BASE, RA]
+  |   // strd CARG3, CARG4, [BASE, RA]
+  |   strd_i CARG3, CARG4, BASE, RA
   |  b ->cont_nop
   |
   |//-- Table indexing metamethods -----------------------------------------
@@ -602,7 +660,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  ldrd CARG3, CARG4, [CRET1]
   |   ins_next1
   |   ins_next2
-  |  strd CARG3, CARG4, [BASE, RA]
+  |  // strd CARG3, CARG4, [BASE, RA]
+  |  strd_i CARG3, CARG4, BASE, RA
   |   ins_next3
   |
   |3:  // Call __index metamethod.
@@ -653,7 +712,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  // Returns TValue * (finished) or NULL (metamethod).
   |  .IOS ldr BASE, L->base
   |  cmp CRET1, #0
-  |   ldrd CARG3, CARG4, [BASE, RA]
+  |   // ldrd CARG3, CARG4, [BASE, RA]
+  |   ldrd_i CARG3, CARG4, BASE, RA
   |  beq >3
   |   ins_next1
   |  // NOBARRIER: lj_meta_tset ensures the table is not black.
@@ -700,7 +760,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  ldr INS, [PC, #-4]
   |   ldrd CARG1, CARG2, [RA]
   |  decode_RA8 CARG3, INS
-  |   strd CARG1, CARG2, [BASE, CARG3]
+  |   // strd CARG1, CARG2, [BASE, CARG3]
+  |   strd_i CARG1, CARG2, BASE, CARG3
   |  b ->cont_nop
   |
   |->cont_condt:			// RA = resultptr
@@ -950,7 +1011,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  mvnlo CARG2, #~LJ_TISNUM
   |  rsb CARG4, CARG2, #(int)(offsetof(GCfuncC, upvalue)>>3)-1
   |  lsl CARG4, CARG4, #3
-  |  ldrd CARG1, CARG2, [CFUNC:CARG3, CARG4]
+  |  // ldrd CARG1, CARG2, [CFUNC:CARG3, CARG4]
+  |  ldrd_i CARG1, CARG2, CFUNC:CARG3, CARG4
   |  b ->fff_restv
   |
   |//-- Base library: getters and setters ---------------------------------
@@ -1064,7 +1126,8 @@ static void build_subroutines(BuildCtx *ctx)
   |.ffunc_1 next
   |   mvn CARG4, #~LJ_TNIL
   |  checktab CARG2, ->fff_fallback
-  |   strd CARG3, CARG4, [BASE, NARGS8:RC]	// Set missing 2nd arg to nil.
+  |   // strd CARG3, CARG4, [BASE, NARGS8:RC]  // Set missing 2nd arg to nil.
+  |   strd_i CARG3, CARG4, BASE, NARGS8:RC	// Set missing 2nd arg to nil.
   |   ldr PC, [BASE, FRAME_PC]
   |  mov CARG2, CARG1
   |    str BASE, L->base		// Add frame since C call can throw.
@@ -1216,9 +1279,11 @@ static void build_subroutines(BuildCtx *ctx)
   |  str CARG3, L:CARG1->top
   |  str BASE, L->top
   |2:  // Move args to coroutine.
-  |   ldrd CARG3, CARG4, [BASE, RB]
+  |   // ldrd CARG3, CARG4, [BASE, RB]
+  |   ldrd_i CARG3, CARG4, BASE, RB
   |  cmp RB, NARGS8:RC
-  |   strdne CARG3, CARG4, [CARG2, RB]
+  |   // strdne CARG3, CARG4, [CARG2, RB]
+  |   strdne_i CARG3, CARG4, CARG2, RB
   |  add RB, RB, #8
   |  bne <2
   |
@@ -1246,9 +1311,11 @@ static void build_subroutines(BuildCtx *ctx)
   |  sub CARG4, RC, #8
   |   str CARG3, L:RA->top		// Clear coroutine stack.
   |5:  // Move results from coroutine.
-  |   ldrd CARG1, CARG2, [CARG3, RB]
+  |   // ldrd CARG1, CARG2, [CARG3, RB]
+  |   ldrd_i CARG1, CARG2, CARG3, RB
   |  cmp RB, CARG4
-  |   strd CARG1, CARG2, [BASE, RB]
+  |   // strd CARG1, CARG2, [BASE, RB]
+  |   strd_i CARG1, CARG2, BASE, RB
   |  add RB, RB, #8
   |  bne <5
   |6:
@@ -1644,7 +1711,8 @@ static void build_subroutines(BuildCtx *ctx)
   |   mov RA, #8
   |  bne >4
   |1:  // Handle integers.
-  |  ldrd CARG3, CARG4, [BASE, RA]
+  |  // ldrd CARG3, CARG4, [BASE, RA]
+  |  ldrd_i CARG3, CARG4, BASE, RA
   |   cmp RA, RC
   |   bhs ->fff_restv
   |  checktp CARG4, LJ_TISNUM
@@ -1656,13 +1724,15 @@ static void build_subroutines(BuildCtx *ctx)
   |3:  // Convert intermediate result to number and continue below.
   |  bhi ->fff_fallback
   |  bl extern __aeabi_i2d
-  |  ldrd CARG3, CARG4, [BASE, RA]
+  |  // ldrd CARG3, CARG4, [BASE, RA]
+  |  ldrd_i CARG3, CARG4, BASE, RA
   |  b >6
   |
   |4:
   |  bhi ->fff_fallback
   |5:  // Handle numbers.
-  |  ldrd CARG3, CARG4, [BASE, RA]
+  |  // ldrd CARG3, CARG4, [BASE, RA]
+  |  ldrd_i CARG3, CARG4, BASE, RA
   |   cmp RA, RC
   |   bhs ->fff_restv
   |  checktp CARG4, LJ_TISNUM
@@ -1900,7 +1970,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov CARG3, CARG1
   |  mov RA, #8
   |1:
-  |  ldrd CARG1, CARG2, [BASE, RA]
+  |  // ldrd CARG1, CARG2, [BASE, RA]
+  |  ldrd_i CARG1, CARG2, BASE, RA
   |   cmp RA, NARGS8:RC
   |    add RA, RA, #8
   |   bge >2
@@ -2508,9 +2579,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_ISLT: case BC_ISGE: case BC_ISLE: case BC_ISGT:
     |  // RA = src1*8, RC = src2, JMP with RC = target
     |   lsl RC, RC, #3
-    |  ldrd CARG1, CARG2, [RA, BASE]!
+    |  // ldrd CARG1, CARG2, [RA, BASE]!
+    |  ldrd_iw CARG1, CARG2, RA, BASE
     |    ldrh RB, [PC, #2]
-    |   ldrd CARG3, CARG4, [RC, BASE]!
+    |   // ldrd CARG3, CARG4, [RC, BASE]!
+    |   ldrd_iw CARG3, CARG4, RC, BASE
     |    add PC, PC, #4
     |    add RB, PC, RB, lsl #2
     |  checktp CARG2, LJ_TISNUM
@@ -2605,9 +2678,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     vk = op == BC_ISEQV;
     |  // RA = src1*8, RC = src2, JMP with RC = target
     |   lsl RC, RC, #3
-    |  ldrd CARG1, CARG2, [RA, BASE]!
+    |  // ldrd CARG1, CARG2, [RA, BASE]!
+    |  ldrd_iw CARG1, CARG2, RA, BASE
     |    ldrh RB, [PC, #2]
-    |   ldrd CARG3, CARG4, [RC, BASE]!
+    |   // ldrd CARG3, CARG4, [RC, BASE]!
+    |   ldrd_iw CARG3, CARG4, RC, BASE
     |    add PC, PC, #4
     |    add RB, PC, RB, lsl #2
     |  checktp CARG2, LJ_TISNUM
@@ -2672,7 +2747,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     vk = op == BC_ISEQS;
     |  // RA = src*8, RC = str_const (~), JMP with RC = target
     |   mvn RC, RC
-    |  ldrd CARG1, CARG2, [BASE, RA]
+    |  // ldrd CARG1, CARG2, [BASE, RA]
+    |  ldrd_i CARG1, CARG2, BASE, RA
     |    ldrh RB, [PC, #2]
     |   ldr STR:CARG3, [KBASE, RC, lsl #2]
     |    add PC, PC, #4
@@ -2705,9 +2781,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     vk = op == BC_ISEQN;
     |  // RA = src*8, RC = num_const (~), JMP with RC = target
     |   lsl RC, RC, #3
-    |  ldrd CARG1, CARG2, [RA, BASE]!
+    |  // ldrd CARG1, CARG2, [RA, BASE]!
+    |  ldrd_iw CARG1, CARG2, RA, BASE
     |    ldrh RB, [PC, #2]
-    |   ldrd CARG3, CARG4, [RC, KBASE]!
+    |   // ldrd CARG3, CARG4, [RC, KBASE]!
+    |   ldrd_iw CARG3, CARG4, RC, KBASE
     |    add PC, PC, #4
     |    add RB, PC, RB, lsl #2
     if (vk) {
@@ -2792,7 +2870,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_ISEQP: case BC_ISNEP:
     vk = op == BC_ISEQP;
     |  // RA = src*8, RC = primitive_type (~), JMP with RC = target
-    |  ldrd CARG1, CARG2, [BASE, RA]
+    |  // ldrd CARG1, CARG2, [BASE, RA]
+    |  ldrd_i CARG1, CARG2, BASE, RA
     |   ldrh RB, [PC, #2]
     |   add PC, PC, #4
     |  mvn RC, RC
@@ -2823,12 +2902,15 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     if (op == BC_ISTC || op == BC_IST) {
       |  subls PC, RB, #0x20000
       if (op == BC_ISTC) {
-	|  strdls CARG1, CARG2, [BASE, RA]
+  |  // strdls CARG1, CARG2, [BASE, RA]
+	|  strdls_i CARG1, CARG2, BASE, RA
       }
     } else {
+      |  it hi
       |  subhi PC, RB, #0x20000
       if (op == BC_ISFC) {
-	|  strdhi CARG1, CARG2, [BASE, RA]
+  |  // strdhi CARG1, CARG2, [BASE, RA]
+	|  strdhi_i CARG1, CARG2, BASE, RA
       }
     }
     |  ins_next
@@ -2840,9 +2922,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  // RA = dst*8, RC = src
     |  lsl RC, RC, #3
     |   ins_next1
-    |  ldrd CARG1, CARG2, [BASE, RC]
+    |  // ldrd CARG1, CARG2, [BASE, RC]
+    |  ldrd_i CARG1, CARG2, BASE, RC
     |   ins_next2
-    |  strd CARG1, CARG2, [BASE, RA]
+    |  // strd CARG1, CARG2, [BASE, RA]
+    |  strd_i CARG1, CARG2, BASE, RA
     |   ins_next3
     break;
   case BC_NOT:
@@ -2861,7 +2945,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_UNM:
     |  // RA = dst*8, RC = src
     |  lsl RC, RC, #3
-    |  ldrd CARG1, CARG2, [BASE, RC]
+    |  // ldrd CARG1, CARG2, [BASE, RC]
+    |  ldrd_i CARG1, CARG2, BASE, RC
     |   ins_next1
     |   ins_next2
     |  checktp CARG2, LJ_TISNUM
@@ -2871,7 +2956,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  rsbseq CARG1, CARG1, #0
     |  ldrdvs CARG1, CARG2, >9
     |5:
-    |  strd CARG1, CARG2, [BASE, RA]
+    |  // strd CARG1, CARG2, [BASE, RA]
+    |  strd_i CARG1, CARG2, BASE, RA
     |   ins_next3
     |
     |.align 8
@@ -2881,14 +2967,16 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_LEN:
     |  // RA = dst*8, RC = src
     |  lsl RC, RC, #3
-    |  ldrd CARG1, CARG2, [BASE, RC]
+    |  // ldrd CARG1, CARG2, [BASE, RC]
+    |  ldrd_i CARG1, CARG2, BASE, RC
     |  checkstr CARG2, >2
     |  ldr CARG1, STR:CARG1->len
     |1:
     |  mvn CARG2, #~LJ_TISNUM
     |   ins_next1
     |   ins_next2
-    |  strd CARG1, CARG2, [BASE, RA]
+    |  // strd CARG1, CARG2, [BASE, RA]
+    |  strd_i CARG1, CARG2, BASE, RA
     |   ins_next3
     |2:
     |  checktab CARG2, ->vmeta_len
@@ -2940,29 +3028,41 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     ||switch (vk) {
     ||case 0:
     |   .if FPU
-    |   ldrd CARG1, CARG2, [RB, BASE]!
-    |    ldrd CARG3, CARG4, [RC, KBASE]!
+    |   // ldrd CARG1, CARG2, [RB, BASE]!
+    |   ldrd_iw CARG1, CARG2, RB, BASE
+    |    // ldrd CARG3, CARG4, [RC, KBASE]!
+    |    ldrd_iw CARG3, CARG4, RC, KBASE
     |   .else
-    |   ldrd CARG1, CARG2, [BASE, RB]
-    |    ldrd CARG3, CARG4, [KBASE, RC]
+    |   // ldrd CARG1, CARG2, [BASE, RB]
+    |   ldrd_i CARG1, CARG2, BASE, RB
+    |    // ldrd CARG3, CARG4, [KBASE, RC]
+    |    ldrd_i CARG3, CARG4, KBASE, RC
     |   .endif
     ||  break;
     ||case 1:
     |   .if FPU
-    |   ldrd CARG3, CARG4, [RB, BASE]!
-    |    ldrd CARG1, CARG2, [RC, KBASE]!
+    |   // ldrd CARG3, CARG4, [RB, BASE]!
+    |   ldrd_iw CARG3, CARG4, RB, BASE
+    |    // ldrd CARG1, CARG2, [RC, KBASE]!
+    |    ldrd_iw CARG1, CARG2, RC, KBASE
     |   .else
-    |   ldrd CARG3, CARG4, [BASE, RB]
-    |    ldrd CARG1, CARG2, [KBASE, RC]
+    |   // ldrd CARG3, CARG4, [BASE, RB]
+    |   ldrd_i CARG3, CARG4, BASE, RB
+    |    // ldrd CARG1, CARG2, [KBASE, RC]
+    |    ldrd_i CARG1, CARG2, KBASE, RC
     |   .endif
     ||  break;
     ||default:
     |   .if FPU
-    |   ldrd CARG1, CARG2, [RB, BASE]!
-    |    ldrd CARG3, CARG4, [RC, BASE]!
+    |   // ldrd CARG1, [CARG2], [RB, BASE]!
+    |   ldrd_iw CARG1, CARG2, RB, BASE
+    |    // ldrd CARG3, CARG4, [RC, BASE]!
+    |    ldrd_iw CARG3, CARG4, RC, BASE
     |   .else
-    |   ldrd CARG1, CARG2, [BASE, RB]
-    |    ldrd CARG3, CARG4, [BASE, RC]
+    |   // ldrd CARG1, CARG2, [BASE, RB]
+    |   ldrd_i CARG1, CARG2, BASE, RB
+    |    // ldrd CARG3, CARG4, [BASE, RC]
+    |    ldrd_i CARG3, CARG4, BASE, RC
     |   .endif
     ||  break;
     ||}
@@ -3026,7 +3126,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   ins_next1
     |.endif
     |   ins_next2
-    |  strd CARG1, CARG2, [BASE, RA]
+    |  // strd CARG1, CARG2, [BASE, RA]
+    |  strd_i CARG1, CARG2, BASE, RA
     |   ins_next3
     |5:  // FP variant.
     |  ins_arithpre_fpu d6, d7
@@ -3067,7 +3168,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |.else
     |   ins_next1
     |   ins_next2
-    |  strd CARG1, CARG2, [BASE, RA]
+    |  // strd CARG1, CARG2, [BASE, RA]
+    |  strd_i CARG1, CARG2, BASE, RA
     |   ins_next3
     |.endif
     |.endmacro
@@ -3109,10 +3211,12 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ldr BASE, L->base
     |  cmp CRET1, #0
     |  bne ->vmeta_binop
-    |  ldrd CARG3, CARG4, [BASE, RC]
+    |  // ldrd CARG3, CARG4, [BASE, RC]
+    |  ldrd_i CARG3, CARG4, BASE, RC
     |   ins_next1
     |   ins_next2
-    |  strd CARG3, CARG4, [BASE, RA]		// Copy result to RA.
+    |  // strd CARG3, CARG4, [BASE, RA]    // Copy result to RA.
+    |  strd_i CARG3, CARG4, BASE, RA		// Copy result to RA.
     |   ins_next3
     break;
 
@@ -3125,7 +3229,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ldr CARG1, [KBASE, RC, lsl #2]
     |  mvn CARG2, #~LJ_TSTR
     |   ins_next2
-    |  strd CARG1, CARG2, [BASE, RA]
+    |  // strd CARG1, CARG2, [BASE, RA]
+    |  strd_i CARG1, CARG2, BASE, RA
     |   ins_next3
     break;
   case BC_KCDATA:
@@ -3136,7 +3241,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ldr CARG1, [KBASE, RC, lsl #2]
     |  mvn CARG2, #~LJ_TCDATA
     |   ins_next2
-    |  strd CARG1, CARG2, [BASE, RA]
+    |  // strd CARG1, CARG2, [BASE, RA]
+    |  strd_i CARG1, CARG2, BASE, RA
     |   ins_next3
     |.endif
     break;
@@ -3146,16 +3252,19 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  mvn CARG2, #~LJ_TISNUM
     |   ins_next1
     |   ins_next2
-    |  strd CARG1, CARG2, [BASE, RA]
+    |  // strd CARG1, CARG2, [BASE, RA]
+    |  strd_i CARG1, CARG2, BASE, RA
     |   ins_next3
     break;
   case BC_KNUM:
     |  // RA = dst*8, RC = num_const
     |  lsl RC, RC, #3
     |   ins_next1
-    |  ldrd CARG1, CARG2, [KBASE, RC]
+    |  // ldrd CARG1, CARG2, [KBASE, RC]
+    |  ldrd_i CARG1, CARG2, KBASE, RC
     |   ins_next2
-    |  strd CARG1, CARG2, [BASE, RA]
+    |  // strd CARG1, CARG2, [BASE, RA]
+    |  strd_i CARG1, CARG2, BASE, RA
     |   ins_next3
     break;
   case BC_KPRI:
@@ -3194,7 +3303,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ldrd CARG3, CARG4, [CARG2]
     |   ins_next1
     |   ins_next2
-    |  strd CARG3, CARG4, [BASE, RA]
+    |  // strd CARG3, CARG4, [BASE, RA]
+    |  strd_i CARG3, CARG4, BASE, RA
     |   ins_next3
     break;
   case BC_USETV:
@@ -3204,7 +3314,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   add RA, RA, #offsetof(GCfuncL, uvptr)
     |    lsl RC, RC, #3
     |  ldr UPVAL:CARG2, [LFUNC:CARG2, RA]
-    |    ldrd CARG3, CARG4, [BASE, RC]
+    |    // ldrd CARG3, CARG4, [BASE, RC]
+    |    ldrd_i CARG3, CARG4, BASE, RC
     |  ldrb RB, UPVAL:CARG2->marked
     |  ldrb RC, UPVAL:CARG2->closed
     |    ldr CARG2, UPVAL:CARG2->v
@@ -3274,7 +3385,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   add RA, RA, #offsetof(GCfuncL, uvptr)
     |    lsl RC, RC, #3
     |  ldr UPVAL:CARG2, [LFUNC:CARG2, RA]
-    |    ldrd CARG3, CARG4, [KBASE, RC]
+    |    // ldrd CARG3, CARG4, [KBASE, RC]
+    |    ldrd_i CARG3, CARG4, KBASE, RC
     |  ldr CARG2, UPVAL:CARG2->v
     |   ins_next1
     |   ins_next2
@@ -3326,7 +3438,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  mvn CARG2, #~LJ_TFUNC
     |   ins_next1
     |   ins_next2
-    |  strd CARG1, CARG2, [BASE, RA]
+    |  // strd CARG1, CARG2, [BASE, RA]
+    |  strd_i CARG1, CARG2, BASE, RA
     |   ins_next3
     break;
 
@@ -3364,7 +3477,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  mvn CARG2, #~LJ_TTAB
     |   ins_next1
     |   ins_next2
-    |  strd CARG1, CARG2, [BASE, RA]
+    |  // strd CARG1, CARG2, [BASE, RA]
+    |  strd_i CARG1, CARG2, BASE, RA
     |   ins_next3
     |5:
     |  bl extern lj_gc_step_fixtop  // (lua_State *L)
@@ -3391,8 +3505,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  decode_RB8 RB, INS
     |   decode_RC8 RC, INS
     |  // RA = dst*8, RB = table*8, RC = key*8
-    |  ldrd TAB:CARG1, TAB:CARG2, [BASE, RB]
-    |   ldrd CARG3, CARG4, [BASE, RC]
+    |  // ldrd TAB:CARG1, TAB:CARG2, [BASE, RB]
+    |  ldrd_i TAB:CARG1, TAB:CARG2, BASE, RB
+    |   // ldrd CARG3, CARG4, [BASE, RC]
+    |   ldrd_i CARG3, CARG4, BASE, RC
     |  checktab CARG2, ->vmeta_tgetv  // STALL: load CARG12.
     |   checktp CARG4, LJ_TISNUM	// Integer key?
     |  ldreq CARG4, TAB:CARG1->array
@@ -3408,7 +3524,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  beq >5
     |1:
     |   ins_next2
-    |  strd CARG3, CARG4, [BASE, RA]
+    |  // strd CARG3, CARG4, [BASE, RA]
+    |  strd_i CARG3, CARG4, BASE, RA
     |   ins_next3
     |
     |5:  // Check for __index if table value is nil.
@@ -3431,7 +3548,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  decode_RB8 RB, INS
     |   and RC, RC, #255
     |  // RA = dst*8, RB = table*8, RC = str_const (~)
-    |  ldrd CARG1, CARG2, [BASE, RB]
+    |  // ldrd CARG1, CARG2, [BASE, RB]
+    |  ldrd_i CARG1, CARG2, BASE, RB
     |   mvn RC, RC
     |   ldr STR:RC, [KBASE, RC, lsl #2]  // STALL: early RC.
     |  checktab CARG2, ->vmeta_tgets1
@@ -3456,7 +3574,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |3:
     |   ins_next1
     |   ins_next2
-    |  strd CARG3, CARG4, [BASE, RA]
+    |  // strd CARG3, CARG4, [BASE, RA]
+    |  strd_i CARG3, CARG4, BASE, RA
     |   ins_next3
     |
     |4:  // Follow hash chain.
@@ -3479,20 +3598,23 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  decode_RB8 RB, INS
     |   and RC, RC, #255
     |  // RA = dst*8, RB = table*8, RC = index
-    |  ldrd CARG1, CARG2, [BASE, RB]
+    |  // ldrd CARG1, CARG2, [BASE, RB]
+    |  ldrd_i CARG1, CARG2, BASE, RB
     |  checktab CARG2, ->vmeta_tgetb  // STALL: load CARG12.
     |   ldr CARG3, TAB:CARG1->asize
     |  ldr CARG4, TAB:CARG1->array
     |  lsl CARG2, RC, #3
     |   cmp RC, CARG3
-    |  ldrdlo CARG3, CARG4, [CARG4, CARG2]
+    |  // ldrdlo CARG3, CARG4, [CARG4, CARG2]
+    |  ldrdlo_i CARG3, CARG4, CARG4, CARG2
     |   bhs ->vmeta_tgetb
     |   ins_next1  // Overwrites RB!
     |  checktp CARG4, LJ_TNIL
     |  beq >5
     |1:
     |   ins_next2
-    |  strd CARG3, CARG4, [BASE, RA]
+    |  // strd CARG3, CARG4, [BASE, RA]
+    |  strd_i CARG3, CARG4, BASE, RA
     |   ins_next3
     |
     |5:  // Check for __index if table value is nil.
@@ -3509,8 +3631,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  decode_RB8 RB, INS
     |   decode_RC8 RC, INS
     |  // RA = src*8, RB = table*8, RC = key*8
-    |  ldrd TAB:CARG1, TAB:CARG2, [BASE, RB]
-    |   ldrd CARG3, CARG4, [BASE, RC]
+    |  // ldrd TAB:CARG1, TAB:CARG2, [BASE, RB]
+    |  ldrd_i TAB:CARG1, TAB:CARG2, BASE, RB
+    |   // ldrd CARG3, CARG4, [BASE, RC]
+    |   ldrd_i CARG3, CARG4, BASE, RC
     |  checktab CARG2, ->vmeta_tsetv  // STALL: load CARG12.
     |   checktp CARG4, LJ_TISNUM	// Integer key?
     |  ldreq CARG2, TAB:CARG1->array
@@ -3524,7 +3648,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   ins_next1  // Overwrites RB!
     |  checktp INS, LJ_TNIL
     |  ldrb INS, TAB:CARG1->marked
-    |   ldrd CARG3, CARG4, [BASE, RA]
+    |   // ldrd CARG3, CARG4, [BASE, RA]
+    |   ldrd_i CARG3, CARG4, BASE, RA
     |  beq >5
     |1:
     |  tst INS, #LJ_GC_BLACK		// isblack(table)
@@ -3560,7 +3685,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  decode_RB8 RB, INS
     |   and RC, RC, #255
     |  // RA = src*8, RB = table*8, RC = str_const (~)
-    |  ldrd CARG1, CARG2, [BASE, RB]
+    |  // ldrd CARG1, CARG2, [BASE, RB]
+    |  ldrd_i CARG1, CARG2, BASE, RB
     |   mvn RC, RC
     |   ldr STR:RC, [KBASE, RC, lsl #2]  // STALL: early RC.
     |  checktab CARG2, ->vmeta_tsets1
@@ -3584,7 +3710,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  bne >5
     |  ldrb CARG2, TAB:RB->marked
     |   checktp CARG4, LJ_TNIL		// Key found, but nil value?
-    |    ldrd CARG3, CARG4, [BASE, RA]
+    |    //ldrd CARG3, CARG4, [BASE, RA]
+    |    ldrd_i CARG3, CARG4, BASE, RA
     |   beq >4
     |2:
     |  tst CARG2, #LJ_GC_BLACK		// isblack(table)
@@ -3626,7 +3753,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  bl extern lj_tab_newkey		// (lua_State *L, GCtab *t, TValue *k)
     |  // Returns TValue *.
     |  ldr BASE, L->base
-    |  ldrd CARG3, CARG4, [BASE, RA]
+    |  // ldrd CARG3, CARG4, [BASE, RA]
+    |  ldrd_i CARG3, CARG4, BASE, RA
     |  strd CARG3, CARG4, [CRET1]
     |  b <3				// No 2nd write barrier needed.
     |
@@ -3638,18 +3766,21 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  decode_RB8 RB, INS
     |   and RC, RC, #255
     |  // RA = src*8, RB = table*8, RC = index
-    |  ldrd CARG1, CARG2, [BASE, RB]
+    |  // ldrd CARG1, CARG2, [BASE, RB]
+    |  ldrd_i CARG1, CARG2, BASE, RB
     |  checktab CARG2, ->vmeta_tsetb  // STALL: load CARG12.
     |   ldr CARG3, TAB:CARG1->asize
     |  ldr RB, TAB:CARG1->array
     |  lsl CARG2, RC, #3
     |   cmp RC, CARG3
-    |  ldrdlo CARG3, CARG4, [CARG2, RB]!
+    |  // ldrdlo CARG3, CARG4, [CARG2, RB]!
+    |  ldrdlo_iw CARG3, CARG4, CARG2, RB
     |   bhs ->vmeta_tsetb
     |   ins_next1  // Overwrites RB!
     |  checktp CARG4, LJ_TNIL
     |  ldrb INS, TAB:CARG1->marked
-    |   ldrd CARG3, CARG4, [BASE, RA]
+    |   // ldrd CARG3, CARG4, [BASE, RA]
+    |   ldrd_i CARG3, CARG4, BASE, RA
     |  beq >5
     |1:
     |  tst INS, #LJ_GC_BLACK		// isblack(table)
@@ -3730,7 +3861,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  // RA = base*8, (RB = nresults+1,) RC = (nargs+1)*8
     |->BC_CALL_Z:
     |  mov RB, BASE			// Save old BASE for vmeta_call.
-    |  ldrd CARG3, CARG4, [BASE, RA]!
+    |  // ldrd CARG3, CARG4, [BASE, RA]!
+    |  ldrd_iw CARG3, CARG4, BASE, RA
     |   sub NARGS8:RC, NARGS8:RC, #8
     |   add BASE, BASE, #8
     |  checkfunc CARG4, ->vmeta_call
@@ -3747,7 +3879,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  lsl NARGS8:RC, RC, #3
     |  // RA = base*8, (RB = 0,) RC = (nargs+1)*8
     |->BC_CALLT1_Z:
-    |  ldrd LFUNC:CARG3, LFUNC:CARG4, [RA, BASE]!
+    |  // ldrd LFUNC:CARG3, LFUNC:CARG4, [RA, BASE]!
+    |  ldrd_iw LFUNC:CARG3, LFUNC:CARG4, RA, BASE
     |   sub NARGS8:RC, NARGS8:RC, #8
     |   add RA, RA, #8
     |  checkfunc CARG4, ->vmeta_callt
@@ -3762,10 +3895,12 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  cmp NARGS8:RC, #0
     |  beq >3
     |2:
-    |  ldrd CARG1, CARG2, [RA, RB]
+    |  // ldrd CARG1, CARG2, [RA, RB]
+    |  ldrd_i CARG1, CARG2, RA, RB
     |   add INS, RB, #8
     |   cmp INS, NARGS8:RC
-    |  strd CARG1, CARG2, [BASE, RB]
+    |  // strd CARG1, CARG2, [BASE, RB]
+    |  strd_i CARG1, CARG2, BASE, RB
     |    mov RB, INS
     |   bne <2
     |3:
@@ -4034,7 +4169,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   ldreq INS, [PC, #-4]
     |  bne ->BC_RETV1_Z
     if (op == BC_RET1) {
-      |  ldrd CARG1, CARG2, [BASE, RA]
+      |  // ldrd CARG1, CARG2, [BASE, RA]
+      |  ldrd_i CARG1, CARG2, BASE, RA
     }
     |  sub CARG4, BASE, #8
     |   decode_RA8 RA, INS
@@ -4084,7 +4220,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_IFORL:
     |  // RA = base*8, RC = target (after end of loop or start of loop)
     vk = (op == BC_IFORL || op == BC_JFORL);
-    |  ldrd CARG1, CARG2, [RA, BASE]!
+    |  // ldrd CARG1, CARG2, [RA, BASE]!
+    |  ldrd_iw CARG1, CARG2, RA, BASE
     if (op != BC_JFORL) {
       |   add RC, PC, RC, lsl #2
     }
@@ -4232,7 +4369,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
 #endif
   case BC_IITERL:
     |  // RA = base*8, RC = target
-    |  ldrd CARG1, CARG2, [RA, BASE]!
+    |  // ldrd CARG1, CARG2, [RA, BASE]!
+    |  ldrd_iw CARG1, CARG2, RA, BASE
     if (op == BC_JITERL) {
       |  cmn CARG2, #-LJ_TNIL		// Stop if iterator returned nil.
       |  strdne CARG1, CARG2, [RA, #-8]
@@ -4320,7 +4458,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     }
     |
     |3:  // Clear missing parameters.
-    |  strd CARG3, CARG4, [BASE, NARGS8:RC]
+    |  // strd CARG3, CARG4, [BASE, NARGS8:RC]
+    |  strd_i CARG3, CARG4, BASE, NARGS8:RC
     |  add NARGS8:RC, NARGS8:RC, #8
     |  b <2
     break;
