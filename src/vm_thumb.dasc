@@ -1785,7 +1785,7 @@ static void build_subroutines(BuildCtx *ctx)
   |    ldr PC, [BASE, FRAME_PC]
   |   cmp NARGS8:RC, #8			// Need exactly 1 argument.
   |   checktpeq CARG2, LJ_TISNUM
-  |   bicseq CARG4, CARG1, #255
+  |   bicseq.w CARG4, CARG1, #255
   |  mov CARG3, #1
   |   bne ->fff_fallback
   |  str CARG1, TMPD

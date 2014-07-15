@@ -274,7 +274,8 @@ local map_op = {
   ["adc.w_4"] = "sdnmT:11101011010snnnn0iiiddddiiTTmmmm",
   ["adc_2"] = "sdm:0100000101mmmddd",
   ["add_3"] = "sdni:0001110iiinnnddd|sdnm:0001100mmmnnnddd|sdpi:10101dddffffffff|sppi:101100000fffffff",
-  ["add_2"] = "sdi:00110dddiiiiiiii|sdm:01000100dmmmmddd|spi:101100000fffffff",
+  ["adds_2"] = "sdi:00110dddiiiiiiii|spi:101100000fffffff",
+  ["add_2"] = "dm:01000100dmmmmddd",
   ["add.w_3"] = "sdni:11110H01000snnnn0HHHddddHHHHHHHH|sdnmT:11101011000snnnn0iiiddddiiTTmmmm",
   ["add.w_4"] = "sdnmT:11101011000snnnn0iiiddddiiTTmmmm",
   ["addw_3"] = "dnM:11110M100000nnnn0MMMddddMMMMMMMM",
@@ -351,7 +352,8 @@ local map_op = {
   ["lsr_2"] = "sdm:0100000011mmmddd",
   ["mla_4"] = "dnma:111110110000nnnnaaaadddd0000mmmm",
   ["mls_4"] = "dnma:111110110000nnnnaaaadddd0001mmmm",
-  ["mov_2"] = "sdi:00100dddiiiiiiii|sdm:01000110dmmmmddd",
+  ["mov_2"] = "dm:01000110dmmmmddd",
+  ["movs_2"] = "di:00100dddiiiiiiii",
   ["mov.w_2"] = "sdi:11110H00010s11110HHHddddHHHHHHHH|sdm:11101010010s11110000dddd0000mmmm",
   ["movw_2"] = "di:11110H100100kkkk0HHHddddHHHHHHHH",
   ["movt_2"] = "di:11110H101100kkkk0HHHddddHHHHHHHH",
@@ -474,11 +476,13 @@ do
   local addt = {}
   for k,v in pairs(map_op) do
     local s = k:gsub("([.]?w?)(_%d+)$", "s%1%2")
-    for i in gmatch(v, "[^:|]+:") do
-      if i:sub(1, 1) == 's' then
-        addt[s] = gsub(gsub(gsub(v, "^s", ""), "|s", "|"), "s", "1")
-        if not match(gsub(gsub(v, "^s", ""), "|s", "|"), "s") then
-          map_op[k] = nil
+    if not match(k, "s_") then -- explicit s_
+      for i in gmatch(v, "[^:|]+:") do
+        if i:sub(1, 1) == 's' then
+          addt[s] = gsub(gsub(gsub(v, "^s", ""), "|s", "|"), "s", "1")
+          if not match(gsub(gsub(v, "^s", ""), "|s", "|"), "s") then
+            map_op[k] = nil
+          end
         end
       end
     end
@@ -524,7 +528,11 @@ do
   for cond,c in pairs(map_cond) do
     for k,v in pairs(map_op) do
       if k ~= 'b_1' and b ~= 'b.w_1' then
-        local s = k:gsub("([.]?w?)(_%d+)$", cond .. "%1%2")
+        local k2 = k
+        if match(k, "s_") and not match(v, "s") then
+          k2 = k2:gsub("s_", "_")
+        end
+        local s = k2:gsub("([.]?w?)(_%d+)$", cond .. "%1%2")
         addt[s] = '#C' .. cond .. '|' .. k
       else
         local s = k:gsub("([.]?w?)(_%d+)$", cond .. "%1%2")
@@ -1133,6 +1141,7 @@ map_op[".template__"] = function(params, template, nparams)
     itstateexplicit = template:sub(3)
     itstate = 'i'
     itstatepos = wpos()
+    wputpos(itstatepos, 0)
     itstatecond = map_cond[params[1]]
     return
   end
