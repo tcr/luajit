@@ -105,6 +105,27 @@ local function waction(action, val, a, num)
   if a or num then secpos = secpos + (num or 1) end
 end
 
+local itstate, itstatecond, itstateexplicit, itstatepos = nil, nil, nil, nil
+
+local function witreset()
+  if itstateexplicit and itstateexplicit ~= itstate then
+    local err = 'conditional statement does not match conditional "' .. itstate .. '"'
+    itstate, itstatecond, itstateexplicit = nil, nil, nil
+    werror(err)
+  end
+  local mask, maskstr = 0x8, itstate:sub(3)
+  while #maskstr > 0 do
+    if maskstr:sub(1,1) == 't' then
+      mask = shl(itstatecond % 2, 3) + shr(mask, 1)
+    else
+      mask = shl((itstatecond + 1) % 2, 3) + shr(mask, 1)
+    end
+    maskstr = maskstr:sub(2)
+  end
+  actlist[itstatepos] = 0xbf00 + shl(itstatecond, 4) + mask
+  itstate, itstatecond, itstateexplicit = nil, nil, nil
+end
+
 -- Flush action list (intervening C code or buffer pos overflow).
 local function wflush(term)
   if #actlist == actargs[1] then return end -- Nothing to flush.
@@ -112,6 +133,10 @@ local function wflush(term)
   wline(format("dasm_put(Dst, %s);", concat(actargs, ", ")), true)
   actargs = { #actlist } -- Actionlist offset is 1st arg to next dasm_put().
   secpos = 1 -- The actionlist offset occupies a buffer position, too.
+
+  if itstate then
+    witreset()
+  end
 end
 
 -- Put escaped word.
@@ -337,7 +362,7 @@ local map_op = {
   ["mvn.w_2"] = "sdi:11110H00011s11110HHHddddHHHHHHHH|sdmT:11101010011s11110iiiddddiiTTmmmm",
   ["mvn.w_3"] = "sdmT:11101010011s11110iiiddddiiTTmmmm",
   ["mvn_2"] = "sdm:0100001111mmmddd",
-  ["nop_0"] = ":1011111100000000",
+  ["nop_0"] = "X:1011111100000000",
   ["orn_3"] = "sdni:11110H00011snnnn0HHHddddHHHHHHHH|sdnmT:11101010011snnnn0iiiddddiiTTmmmm",
   ["orn_4"] = "sdnmT:11101010011snnnn0iiiddddiiTTmmmm",
   ["orr.w_3"] = "sdni:11110H00010snnnn0HHHddddHHHHHHHH|sdnmT:11101010010snnnn0iiiddddiiTTmmmm",
@@ -452,6 +477,9 @@ do
     for i in gmatch(v, "[^:|]+:") do
       if i:sub(1, 1) == 's' then
         addt[s] = gsub(gsub(gsub(v, "^s", ""), "|s", "|"), "s", "1")
+        if not match(gsub(gsub(v, "^s", ""), "|s", "|"), "s") then
+          map_op[k] = nil
+        end
       end
     end
   end
@@ -1027,6 +1055,10 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
         end
       end
 
+    elseif p == 'X' then
+      -- nop
+      n = n + 1
+
     -- elseif p == '{' then
     --   local newpidx = pidx
     --   while templatestr:sub(newpidx, newpidx) ~= '}' and newpidx <= #templatestr do
@@ -1074,29 +1106,8 @@ local function parse_template_new(params, template, nparams, pos)
   return pos + #template-1
 end
 
-local itstate, itstatecond, itstateexplicit, itstatepos = nil, nil, nil
-
 map_op[".template__"] = function(params, template, nparams)
   if not params then return sub(template, 9) end
-
-  local function itreset ()
-    if itstateexplicit and itstateexplicit ~= itstate then
-      local err = 'conditional statement does not match conditional "' .. itstate .. '"'
-      itstate, itstatecond, itstateexplicit = nil, nil, nil
-      werror(err)
-    end
-    local mask, maskstr = 0x8, itstate:sub(3)
-    while #maskstr > 0 do
-      if maskstr:sub(1,1) == 't' then
-        mask = shl(itstatecond % 2, 3) + shr(mask, 1)
-      else
-        mask = shl((itstatecond + 1) % 2, 3) + shr(mask, 1)
-      end
-      maskstr = maskstr:sub(2)
-    end
-    wputpos(itstatepos, 0xbf00 + shl(itstatecond, 4) + mask)
-    itstate, itstatecond, itstateexplicit = nil, nil, nil
-  end
 
   -- command like and[le]
   if sub(template, 1, 2) == '#C' then
@@ -1104,16 +1115,17 @@ map_op[".template__"] = function(params, template, nparams)
     local cond = map_cond[template:sub(3, 4)]
     template = map_op[template:sub(6)]
     if itstate and shr(cond, 1) ~= shr(itstatecond, 1) then
-      itreset()
+      witreset()
     end
     if itstate == nil then
       -- implicit conditional
       itstate, itstatepos, itstatecond, itstateexplicit = 'it', wpos(), cond, nil
+      wputpos(itstatepos, 0)
     else
       itstate = itstate .. (cond == itstatecond and 't' or 'e')
     end
   elseif itstate then
-    itreset()
+    witreset()
   end
 
   -- explicit IT conditional
