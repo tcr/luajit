@@ -111,6 +111,12 @@ XCFLAGS=
 #XCFLAGS+= -DLUAJIT_NUMMODE=1
 #XCFLAGS+= -DLUAJIT_NUMMODE=2
 #
+<<<<<<< HEAD
+=======
+# Adds Colony semantics to build.
+# XCFLAGS+= -DLJ_COLONY
+#
+>>>>>>> 2cc296d... ooo
 ##############################################################################
 
 ##############################################################################
