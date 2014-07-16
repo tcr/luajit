@@ -816,6 +816,7 @@ dostmt = function(stmt)
   end
 
   -- Call opcode handler or special handler for template strings.
+  _G.__op = op
   if type(f) == "string" then
     map_op[".template__"](params, f)
   else
@@ -1091,4 +1092,3 @@ end
 parseargs{...}
 
 ------------------------------------------------------------------------------
-

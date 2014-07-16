@@ -78,12 +78,13 @@ err:
 static void emit_asm_words(BuildCtx *ctx, uint8_t *p, int n)
 {
   int i;
-  for (i = 0; i < n; i += 4) {
+  for (i = 0; i < n; i += 2) {
+    uint16_t ins = *(uint16_t *)(p+i);
     if ((i & 15) == 0)
-      fprintf(ctx->fp, "\t.long 0x%08x", *(uint32_t *)(p+i));
+      fprintf(ctx->fp, "\t.hword 0x%04x", ins);
     else
-      fprintf(ctx->fp, ",0x%08x", *(uint32_t *)(p+i));
-    if ((i & 15) == 12) putc('\n', ctx->fp);
+      fprintf(ctx->fp, ",0x%04x", ins);
+    if ((i & 15) == 14) putc('\n', ctx->fp);
   }
   if ((n & 15) != 0) putc('\n', ctx->fp);
 }
@@ -92,10 +93,10 @@ static void emit_asm_words(BuildCtx *ctx, uint8_t *p, int n)
 static void emit_asm_wordreloc(BuildCtx *ctx, uint8_t *p, int n,
 			       const char *sym)
 {
+#if LJ_TARGET_ARM
   uint32_t ins;
   emit_asm_words(ctx, p, n-4);
   ins = *(uint32_t *)(p+n-4);
-#if LJ_TARGET_ARM
   if ((ins & 0xff000000u) == 0xfa000000u) {
     fprintf(ctx->fp, "\tblx %s\n", sym);
   } else if ((ins & 0x0e000000u) == 0x0a000000u) {
@@ -107,7 +108,22 @@ static void emit_asm_wordreloc(BuildCtx *ctx, uint8_t *p, int n,
 	    ins, sym);
     exit(1);
   }
+#elif LJ_TARGET_THUMB
+  uint32_t ins;
+  emit_asm_words(ctx, p, n-4);
+  ins = *(uint32_t *)(p+n-4);
+  if ((ins & 0xf800) == 0xf000 && ((ins >> 16) & 0xc000) == 0xc000) {
+    fprintf(ctx->fp, "\tbl %s\n", sym);
+  } else {
+    fprintf(stderr,
+      "Error: unsupported opcode %08x for %s symbol relocation.\n",
+      ins, sym);
+    exit(1);
+  }
 #elif LJ_TARGET_PPC || LJ_TARGET_PPCSPE
+  uint32_t ins;
+  emit_asm_words(ctx, p, n-4);
+  ins = *(uint32_t *)(p+n-4);
 #if LJ_TARGET_PS3
 #define TOCPREFIX "."
 #else
@@ -135,7 +151,7 @@ static void emit_asm_wordreloc(BuildCtx *ctx, uint8_t *p, int n,
 }
 #endif
 
-#if LJ_TARGET_ARM
+#if LJ_TARGET_ARM || LJ_TARGET_THUMB
 #define ELFASM_PX	"%%"
 #else
 #define ELFASM_PX	"@"
@@ -225,7 +241,7 @@ void emit_asm(BuildCtx *ctx)
   if (ctx->mode != BUILD_machasm)
     fprintf(ctx->fp, ".Lbegin:\n");
 
-#if LJ_TARGET_ARM && defined(__GNUC__) && !LJ_NO_UNWIND
+#if (LJ_TARGET_ARM || LJ_TARGET_THUMB) && defined(__GNUC__) && !LJ_NO_UNWIND
   /* This should really be moved into buildvm_arm.dasc. */
   fprintf(ctx->fp,
 	  ".fnstart\n"
@@ -239,7 +255,7 @@ void emit_asm(BuildCtx *ctx)
   for (i = rel = 0; i < ctx->nsym; i++) {
     int32_t ofs = ctx->sym[i].ofs;
     int32_t next = ctx->sym[i+1].ofs;
-#if LJ_TARGET_ARM && defined(__GNUC__) && !LJ_NO_UNWIND && LJ_HASFFI
+#if (LJ_TARGET_ARM || LJ_TARGET_THUMB) && defined(__GNUC__) && !LJ_NO_UNWIND && LJ_HASFFI
     if (!strcmp(ctx->sym[i].name, "lj_vm_ffi_call"))
       fprintf(ctx->fp,
 	      ".globl lj_err_unwind_arm\n"
@@ -274,7 +290,7 @@ void emit_asm(BuildCtx *ctx)
 #endif
   }
 
-#if LJ_TARGET_ARM && defined(__GNUC__) && !LJ_NO_UNWIND
+#if (LJ_TARGET_ARM || LJ_TARGET_THUMB) && defined(__GNUC__) && !LJ_NO_UNWIND
   fprintf(ctx->fp,
 #if !LJ_HASFFI
 	  ".globl lj_err_unwind_arm\n"
@@ -310,4 +326,3 @@ void emit_asm(BuildCtx *ctx)
   }
   fprintf(ctx->fp, "\n");
 }
-
