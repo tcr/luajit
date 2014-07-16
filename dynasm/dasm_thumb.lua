@@ -1043,6 +1043,9 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
               values['U'] = tonumber(not neg)
               if m ~= nil and bits['m'] then
                 values['m'] = m
+                if values['m'] >= shl(1, bits['m']) then
+                  werror('invalid size of register')
+                end
               else
                 werror('cannot use register as index')
               end
