@@ -4252,9 +4252,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  add PC, 4
     |  cmp RB, LJ_TISTRUECOND
     if (op == BC_IST || op == BC_ISTC) {
-      |  jae >1
+      |  jae >6
     } else {
-      |  jb >1
+      |  jb >6
     }
     if (op == BC_ISTC || op == BC_ISFC) {
       |  mov [BASE+RA*8+4], RB
@@ -4263,7 +4263,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     }
     |  movzx RD, PC_RD
     |  branchPC RD
-    |1:					// Fallthrough to the next instruction.
+    |6:					// Fallthrough to the next instruction.
     |  ins_next
     break;
 
