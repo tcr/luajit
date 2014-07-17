@@ -100,7 +100,7 @@ XCFLAGS+= -DLUAJIT_DISABLE_FFI
 # enabled by default. Some other features that *might* break some existing
 # code (e.g. __pairs or os.execute() return values) can be enabled here.
 # Note: this does not provide full compatibility with Lua 5.2 at this time.
-#XCFLAGS+= -DLUAJIT_ENABLE_LUA52COMPAT
+# XCFLAGS+= -DLUAJIT_ENABLE_LUA52COMPAT
 #
 # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
 XCFLAGS+= -DLUAJIT_DISABLE_JIT
@@ -111,12 +111,9 @@ XCFLAGS+= -DLUAJIT_DISABLE_JIT
 #XCFLAGS+= -DLUAJIT_NUMMODE=1
 #XCFLAGS+= -DLUAJIT_NUMMODE=2
 #
-<<<<<<< HEAD
-=======
 # Adds Colony semantics to build.
-# XCFLAGS+= -DLJ_COLONY
+XCFLAGS+= -DLJ_COLONY
 #
->>>>>>> 2cc296d... ooo
 ##############################################################################
 
 ##############################################################################
