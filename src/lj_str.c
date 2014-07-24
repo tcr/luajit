@@ -179,7 +179,7 @@ size_t LJ_FASTCALL lj_str_bufnum(char *s, cTValue *o)
 #endif
     return (size_t)lua_number2str(s, n);
   } else if (((o->u32.hi & 0x000fffff) | o->u32.lo) != 0) {
-#ifdef LJ_COLONY
+#if LJ_COLONY
     s[0] = 'N'; s[1] = 'a'; s[2] = 'N'; return 3;
 #else
     s[0] = 'n'; s[1] = 'a'; s[2] = 'n'; return 3;
