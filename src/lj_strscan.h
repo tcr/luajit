@@ -33,7 +33,7 @@ LJ_FUNC int LJ_FASTCALL lj_strscan_number(GCstr *str, TValue *o);
 /* Check for number or convert string to number/int in-place (!). */
 static LJ_AINLINE int lj_strscan_numberobj(TValue *o)
 {
-#ifdef LJ_COLONY
+#if LJ_COLONY
   return tvisnumber(o) || (tvisstr(o) && lj_strscan_number(strV(o), o)) || (tvisbool(o) && ((o->n = boolV(o)) || 1));
 #else
   return tvisnumber(o) || (tvisstr(o) && lj_strscan_number(strV(o), o));
