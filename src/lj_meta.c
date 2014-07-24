@@ -392,7 +392,7 @@ TValue *lj_meta_comp(lua_State *L, cTValue *o1, cTValue *o2, int op)
     cTValue *mo = lj_meta_lookup(L, tviscdata(o1) ? o1 : o2, mm);
     if (LJ_UNLIKELY(tvisnil(mo))) goto err;
     return mmcall(L, cont, mo, o1, o2);
-  } else if (LJ_52 || itype(o1) == itype(o2)) {
+  } else if (LJ_52 || LJ_COLONY || itype(o1) == itype(o2)) {
     /* Never called with two numbers. */
     if (tvisstr(o1) && tvisstr(o2)) {
       int32_t res = lj_str_cmp(strV(o1), strV(o2));
@@ -403,7 +403,7 @@ TValue *lj_meta_comp(lua_State *L, cTValue *o1, cTValue *o2, int op)
 	ASMFunction cont = (op & 1) ? lj_cont_condf : lj_cont_condt;
 	MMS mm = (op & 2) ? MM_le : MM_lt;
 	cTValue *mo = lj_meta_lookup(L, o1, mm);
-#if LJ_52
+#if LJ_52 || LJ_COLONY
 	if (tvisnil(mo) && tvisnil((mo = lj_meta_lookup(L, o2, mm))))
 #else
 	cTValue *mo2 = lj_meta_lookup(L, o2, mm);

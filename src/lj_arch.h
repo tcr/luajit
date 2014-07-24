@@ -451,7 +451,7 @@
 #endif
 
 /* Compatibility with Lua 5.1 vs. 5.2. */
-#if defined(LUAJIT_ENABLE_LUA52COMPAT) || defined(LUAJIT_COLONY)
+#if defined(LUAJIT_ENABLE_LUA52COMPAT)
 #define LJ_52			1
 #else
 #define LJ_52			0
