@@ -5042,11 +5042,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |
     |  // Integer key?
     |.if DUALNUM
-    |  checkint RC, >5
+    |  checkint RC, >4
     |  mov RC, dword [BASE+RC*8]
     |.else
     |  // Convert number to int and back and compare.
-    |  checknum RC, >5
+    |  checknum RC, >4
     |.if SSE
     |  movsd xmm0, qword [BASE+RC*8]
     |  cvtsd2si RC, xmm0
@@ -5061,6 +5061,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |.endif
     |  jne ->vmeta_tsetv		// Generic numeric key? Use fallback.
     |.endif
+    |->vm_tsetn:
     |  cmp RC, TAB:RB->asize		// Takes care of unordered, too.
     |  jae ->vmeta_tsetv
     |  shl RC, 3
@@ -5091,9 +5092,43 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  movzx RA, PC_RA			// Restore RA.
     |  jmp <1
     |
-    |5:  // String key?
+    |4:  // String key?
     |  checkstr RC, ->vmeta_tsetv
     |  mov STR:RC, [BASE+RC*8]
+#if LJ_COLONY
+    |  // check length
+    |  cmp dword [STR:RC+offsetof(struct GCstr, len)], 0
+    |  je ->BC_TSETS_Z // zero length
+    |
+    |  // check if string is integer
+    |  mov RB, [STR:RC+offsetof(struct GCstr, len)]
+    |  mov TMP1, RB
+    |  lea RB, [STR:RC+sizeof(struct GCstr)]
+    |  add TMP1, RB
+    |  xor RC, RC
+    |5:
+    |  xor RA, RA // necessary?
+    |  mov RAL, [RB]
+    |  sub RA, 48
+    |  cmp RA, 9
+    |  ja >6
+    |  imul RC, RC, 10
+    |  add RC, RA
+    |  inc RB
+    |  cmp RB, TMP1
+    |  jne <5
+    |  movzx RA, PC_RA      // Reload TValue *k from RC.
+    |  movzx RB, PC_RB      // Reload TValue *t from RB.
+    |  mov TAB:RB, [BASE+RB*8]
+    |  jmp ->vm_tsetn // finished
+    |6:
+    |
+    |  movzx RA, PC_RA      // Reload TValue *k from RC.
+    |  movzx RB, PC_RB      // Reload TValue *t from RB.
+    |  movzx RC, PC_RC      // Reload TValue *k from RC.
+    |  mov TAB:RB, [BASE+RB*8]
+    |  mov STR:RC, [BASE+RC*8]
+#endif
     |  jmp ->BC_TSETS_Z
     |
     |7:  // Possible table write barrier for the value. Skip valiswhite check.
