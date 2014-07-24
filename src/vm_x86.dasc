@@ -417,25 +417,6 @@
 |  mov tab->gclist, reg
 |.endmacro
 |
-|.macro strlen, reg
-|  mov STR:reg, [BASE+reg*8]
-|.if DUALNUM
-|  mov reg, dword STR:reg->len
-|1:
-|  mov dword [BASE+RA*8+4], LJ_TISNUM
-|  mov dword [BASE+RA*8], RD
-|.elif SSE
-|  xorps xmm0, xmm0
-|  cvtsi2sd xmm0, dword STR:reg->len
-|1:
-|  movsd qword [BASE+RA*8], xmm0
-|.else
-|  fild dword STR:reg->len
-|1:
-|  fstp qword [BASE+RA*8]
-|.endif
-|.endmacro
-|
 |//-----------------------------------------------------------------------
 
 /* Generate subroutines used by opcodes and other parts of the VM. */
@@ -4266,28 +4247,27 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   /* -- Unary test and copy ops ------------------------------------------- */
 
   case BC_ISTC: case BC_ISFC: case BC_IST: case BC_ISF:
-    |  ins_AD  // RA = dst or unused, RD = src, JMP with RD = target
+    |  ins_AD	// RA = dst or unused, RD = src, JMP with RD = target
     |  mov RB, [BASE+RD*8+4]
     |  add PC, 4
 #if LJ_COLONY
-    |1:
     |  checkstr RD, >2
-    |  strlen RD
-    |  mov RD, RA
-    |  jmp >3
+    |  mov STR:RD, [BASE+RD*8]
+    |  mov RD, dword STR:RD->len
+    |  cmp RD, 1
+    |  cmc
+    |  jmp >5
     |2:
     |  checknum RD, >4
-    |3:
+    |//TODO if DUAL_NUM
     |  fld qword [BASE+RD*8]
     |  fld1
     |  fcomparepp
     |  jmp >5
     |4:
+#endif
     |  cmp RB, LJ_TISTRUECOND
     |5:
-#else
-    |  cmp RB, LJ_TISTRUECOND
-#endif
     if (op == BC_IST || op == BC_ISTC) {
       |  jae >6
     } else {
@@ -4323,12 +4303,15 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_AD	// RA = dst, RD = src
     |  xor RB, RB
 #if LJ_COLONY
+    |  checkstr RD, >2
+    |  mov STR:RD, [BASE+RD*8]
+    |  mov RD, dword STR:RD->len
+    |  cmp RD, 1
+    |  cmc
+    |  jmp >5
     |2:
-    |  checkstr RD, >3
-    |  strlen RD
-    |  mov RD, RA
-    |3:
     |  checknum RD, >4
+    |//TODO if DUAL_NUM
     |  fld qword [BASE+RD*8]
     |  fld1
     |  fcomparepp
@@ -4380,7 +4363,22 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_LEN:
     |  ins_AD	// RA = dst, RD = src
     |  checkstr RD, >2
-    |  strlen RD
+    |  mov STR:RD, [BASE+RD*8]
+    |.if DUALNUM
+    |  mov RD, dword STR:RD->len
+    |1:
+    |  mov dword [BASE+RA*8+4], LJ_TISNUM
+    |  mov dword [BASE+RA*8], RD
+    |.elif SSE
+    |  xorps xmm0, xmm0
+    |  cvtsi2sd xmm0, dword STR:RD->len
+    |1:
+    |  movsd qword [BASE+RA*8], xmm0
+    |.else
+    |  fild dword STR:RD->len
+    |1:
+    |  fstp qword [BASE+RA*8]
+    |.endif
     |  ins_next
     |2:
     |  checktab RD, ->vmeta_len
