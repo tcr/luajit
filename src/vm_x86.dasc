@@ -4269,7 +4269,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_AD  // RA = dst or unused, RD = src, JMP with RD = target
     |  mov RB, [BASE+RD*8+4]
     |  add PC, 4
-#ifdef LJ_COLONY
+#if LJ_COLONY
     |1:
     |  checkstr RD, >2
     |  strlen RD
@@ -4322,7 +4322,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_NOT:
     |  ins_AD	// RA = dst, RD = src
     |  xor RB, RB
-#ifdef LJ_COLONY
+#if LJ_COLONY
     |2:
     |  checkstr RD, >3
     |  strlen RD
