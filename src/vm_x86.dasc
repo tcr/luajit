@@ -4260,9 +4260,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |2:
     |  checknum RD, >4
     |//TODO if DUAL_NUM
-    |  fld qword [BASE+RD*8]
     |  fld1
+    |  fld qword [BASE+RD*8]
     |  fcomparepp
+    |  cmc
     |  jmp >5
     |4:
 #endif
@@ -4312,9 +4313,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |2:
     |  checknum RD, >4
     |//TODO if DUAL_NUM
-    |  fld qword [BASE+RD*8]
     |  fld1
+    |  fld qword [BASE+RD*8]
     |  fcomparepp
+    |  cmc
     |  jmp >5
     |4:
 #endif
