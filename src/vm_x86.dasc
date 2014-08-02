@@ -2668,11 +2668,21 @@ static void build_subroutines(BuildCtx *ctx)
   |->fff_resbit:
   |  cvtsi2sd xmm0, RB
   |  jmp ->fff_resxmm0
+#if LJ_COLONY
+  |->fff_resbitu:
+  |  cvtsi2sd xmm0, RBa
+  |  jmp ->fff_resxmm0
+#endif
   |.else
   |->fff_resbit:
   |  mov ARG1, RB
   |  fild ARG1
   |  jmp ->fff_resn
+#if LJ_COLONY
+  |->fff_resbitu:
+  |  mov dword [esp], RB
+  |  fild dword [esp]
+#endif
   |.endif
   |
   |->fff_fallback_bit_op:
@@ -2703,14 +2713,22 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov RB, ARG1
   |.endif
   |  ins RB, cl				// Assumes RA is ecx.
-  |  jmp ->fff_resbit
   |.endmacro
   |
   |.ffunc_bit_sh bit_lshift, shl
+  |  jmp ->fff_resbit
   |.ffunc_bit_sh bit_rshift, shr
+#if LJ_COLONY
+  |  jmp ->fff_resbitu
+#else
+  |  jmp ->fff_resbit
+#endif
   |.ffunc_bit_sh bit_arshift, sar
+  |  jmp ->fff_resbit
   |.ffunc_bit_sh bit_rol, rol
+  |  jmp ->fff_resbit
   |.ffunc_bit_sh bit_ror, ror
+  |  jmp ->fff_resbit
   |
   |//-----------------------------------------------------------------------
   |
