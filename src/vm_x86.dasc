@@ -4266,32 +4266,38 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
 
   case BC_ISTC: case BC_ISFC: case BC_IST: case BC_ISF:
     |  ins_AD	// RA = dst or unused, RD = src, JMP with RD = target
-    |  mov RB, [BASE+RD*8+4]
     |  add PC, 4
 #if LJ_COLONY
-    |  checkstr RD, >2
-    |  mov STR:RD, [BASE+RD*8]
-    |  mov RD, dword STR:RD->len
-    |  cmp RD, 1
+    |  checkstr RD, >1
+    |  mov STR:RB, [BASE+RD*8]
+    |  mov RB, dword STR:RB->len
+    |  cmp RB, 0
     |  cmc
-    |  jmp >5
-    |2:
-    |  checknum RD, >4
+    |  jmp >2
+    |1:
+    |  checknum RD, >3
     |//TODO if DUAL_NUM
-    |  fld1
+    |  fldz
     |  fld qword [BASE+RD*8]
     |  fcomparepp
-    |  cmc
-    |  jmp >5
-    |4:
+    |2:
+    |  mov RB, [BASE+RD*8+4]
+    if (op == BC_IST || op == BC_ISTC) {
+      |  je >6
+    } else {
+      |  jne >6
+    }
+    |  jmp >4
 #endif
+    |3:
+    |  mov RB, [BASE+RD*8+4]
     |  cmp RB, LJ_TISTRUECOND
-    |5:
     if (op == BC_IST || op == BC_ISTC) {
       |  jae >6
     } else {
       |  jb >6
     }
+    |4:
     if (op == BC_ISTC || op == BC_ISFC) {
       |  mov [BASE+RA*8+4], RB
       |  mov RB, [BASE+RD*8]
