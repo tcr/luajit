@@ -726,9 +726,13 @@ static void bcemit_branch_t(FuncState *fs, ExpDesc *e)
 {
   BCPos pc;
   expr_discharge(fs, e);
+#if LJ_COLONY
+  if (e->k == VJMP)
+#else
   if (e->k == VKSTR || e->k == VKNUM || e->k == VKTRUE)
     pc = NO_JMP;  /* Never jump. */
   else if (e->k == VJMP)
+#endif
     invertcond(fs, e), pc = e->u.s.info;
   else if (e->k == VKFALSE || e->k == VKNIL)
     expr_toreg_nobranch(fs, e, NO_REG), pc = bcemit_jmp(fs);
@@ -748,8 +752,10 @@ static void bcemit_branch_f(FuncState *fs, ExpDesc *e)
     pc = NO_JMP;  /* Never jump. */
   else if (e->k == VJMP)
     pc = e->u.s.info;
+#if !LJ_COLONY
   else if (e->k == VKSTR || e->k == VKNUM || e->k == VKTRUE)
     expr_toreg_nobranch(fs, e, NO_REG), pc = bcemit_jmp(fs);
+#endif
   else
     pc = bcemit_branch(fs, e, 1);
   jmp_append(fs, &e->t, pc);
@@ -927,7 +933,12 @@ static void bcemit_unop(FuncState *fs, BCOp op, ExpDesc *e)
       e->k = VKTRUE;
       return;
     } else if (expr_isk(e) || (LJ_HASFFI && e->k == VKCDATA)) {
+#if LJ_COLONY
+      e->k = (e->k == VKNUM && numV(&e->u.nval) == 0) ||
+        (e->k == VKSTR && e->u.sval->len == 0) ? VKTRUE : VKFALSE;
+#else
       e->k = VKFALSE;
+#endif
       return;
     } else if (e->k == VJMP) {
       invertcond(fs, e);
