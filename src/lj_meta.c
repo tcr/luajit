@@ -152,7 +152,7 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
 TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k)
 {
   TValue tmp;
-#if LJ_COLONY
+#if LJ_COLONY_FALSE
   if ((tvisnum(k) && !tvisnan(k)) || tvisint(k)) {
     setstrV(L, &tmp, lj_str_fromnumber(L, k));
     k = &tmp;
