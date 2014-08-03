@@ -266,7 +266,7 @@ LJLIB_CF(table_sort)
   return 0;
 }
 
-#if LJ_52
+#if LJ_52 || LJ_COLONY
 LJLIB_PUSH("n")
 LJLIB_CF(table_pack)
 {
