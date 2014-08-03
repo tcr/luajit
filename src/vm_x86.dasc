@@ -3151,12 +3151,20 @@ static void build_subroutines(BuildCtx *ctx)
   |  andpd xmm4, xmm2			// |x/y|
   |  ucomisd xmm3, xmm4			// No truncation if 2^52 <= |x/y|.
   |  jbe >1
-  |  andnpd xmm2, xmm0			// Isolate sign bit.
   |  addsd xmm4, xmm3			// (|x/y| + 2^52) - 2^52
   |  subsd xmm4, xmm3
+  |  andnpd xmm2, xmm0      // Isolate sign bit.
   |  orpd xmm4, xmm2			// Merge sign bit back in.
+#if LJ_COLONY
+  |  movaps xmm3, xmm4
+  |  xorpd xmm3, xmm2      // |x/y|
+  |  xorpd xmm0, xmm2      // |result|
+  |  sseconst_1 xmm2, RDa
+  |  cmpsd xmm0, xmm3, 1    // x/y < result?
+#else
   |  sseconst_1 xmm2, RDa
   |  cmpsd xmm0, xmm4, 1		// x/y < result?
+#endif
   |  andpd xmm0, xmm2
   |  subsd xmm4, xmm0			// If yes, subtract 1.0.
   |  movaps xmm0, xmm5
