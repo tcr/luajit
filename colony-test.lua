@@ -4,12 +4,6 @@ function ok (cond, why) if not silent then if not cond then io.write('not '); en
 
 tap(20)
 
-debug.setmetatable('', {__add = function () print('at last'); return 'hello' end})
-local a, b = '0', '2'
-print(a + b)
-
-if 1 then return end
-
 function test ()
 	local zero = 0
 	local one = 1
