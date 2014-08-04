@@ -151,12 +151,6 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
 {
 #if LJ_COLONY
   TValue tmp;
-  if (tvisfunc(o) && gcref(funcV(o)->c.tab)) {
-    cTValue *tv = lj_tab_get(L, tabref(funcV(o)->c.tab), k);
-    if (!tvisnil(tv) || !(lj_meta_fast(L, tabref(basemt_obj(G(L), o)), MM_index))) {
-      return tv;
-    }
-  }
   if (tvisstr(k)) {
     int i = 0;
     for (; i < strV(k)->len; i++) {
@@ -169,7 +163,7 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
       setnumV(&tmp, strtol(strVdata(k), &end, 10));
       k = &tmp;
     }
-  } else if (tvisnum(k) && tvisnan(k)) {
+  } else if (tvisnumber(k) && tvisnan(k)) {
     setstrV(L, &tmp, lj_str_fromnumber(L, k));
     k = &tmp;
   } else if (tvisnil(k)) {
@@ -178,14 +172,8 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
   } else if (tvisbool(k)) {
     setstrV(L, &tmp, lj_str_newz(L, boolV(k) ? "true" : "false"));
     k = &tmp;
-  } else if (tvistab(k) || tvisfunc(k)) {
-    GCfunc *fn = lj_func_newC(L, 2, tabref(L->env));
-    fn->c.f = colony_gettable;
-    TValue mo;
-    setfuncV(L, &mo, fn);
-    L->top = mmcall(L, lj_cont_ra, &mo, o, k);
-    return NULL;
   }
+  // TODO tostring tables
 #endif
   int loop;
   for (loop = 0; loop < LJ_MAX_IDXCHAIN; loop++) {
@@ -214,11 +202,30 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
 TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k)
 {
   TValue tmp;
-#if LJ_COLONY_FALSE
-  if ((tvisnum(k) && !tvisnan(k)) || tvisint(k)) {
+#if LJ_COLONY
+  if (tvisstr(k)) {
+    int i = 0;
+    for (; i < strV(k)->len; i++) {
+      if (!(strVdata(k)[i] >= '0' && strVdata(k)[i] <= '9')) {
+        break;
+      }
+    }
+    if (i == strV(k)->len && (strVdata(k)[0] != '0' || strV(k)->len == 1)) {
+      char* end;
+      setnumV(&tmp, strtol(strVdata(k), &end, 10));
+      k = &tmp;
+    }
+  } else if (tvisnumber(k) && tvisnan(k)) {
     setstrV(L, &tmp, lj_str_fromnumber(L, k));
     k = &tmp;
+  } else if (tvisnil(k)) {
+    setstrV(L, &tmp, lj_str_newz(L, "null"));
+    k = &tmp;
+  } else if (tvisbool(k)) {
+    setstrV(L, &tmp, lj_str_newz(L, boolV(k) ? "true" : "false"));
+    k = &tmp;
   }
+  // TODO tostring tables
 #endif
   int loop;
   for (loop = 0; loop < LJ_MAX_IDXCHAIN; loop++) {
