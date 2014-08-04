@@ -125,14 +125,8 @@ static TValue *mmcall(lua_State *L, ASMFunction cont, cTValue *mo,
 /* Helper for TGET*. __index chain and metamethod. */
 cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
 {
-#if LJ_COLONY
   TValue tmp;
-  if (tvisfunc(o) && gcref(funcV(o)->c.tab)) {
-    cTValue *tv = lj_tab_get(L, tabref(funcV(o)->c.tab), k);
-    if (!tvisnil(tv) || !(lj_meta_fast(L, tabref(basemt_obj(G(L), o)), MM_index))) {
-      return tv;
-    }
-  }
+#if 0
   if (tvisstr(k)) {
     int i = 0;
     for (; i < strV(k)->len; i++) {
@@ -184,14 +178,7 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
 TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k)
 {
   TValue tmp;
-#if LJ_COLONY
-  if (tvisfunc(o) && gcref(funcV(o)->c.tab)) {
-    cTValue *tv = lj_tab_get(L, tabref(funcV(o)->c.tab), k);
-    if (!tvisnil(tv) || !(lj_meta_fast(L, tabref(basemt_obj(G(L), o)), MM_newindex))) {
-      setgcV(L, &tmp, gcref(funcV(o)->c.tab), LJ_TTAB);
-      return lj_meta_tset(L, &tmp, k);
-    }
-  }
+#if 0
   if (tvisstr(k)) {
     int i = 0;
     for (; i < strV(k)->len; i++) {
