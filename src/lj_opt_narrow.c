@@ -567,7 +567,7 @@ TRef lj_opt_narrow_mod(jit_State *J, TRef rb, TRef rc, TValue *vc)
   rb = lj_ir_tonum(J, rb);
   rc = lj_ir_tonum(J, rc);
   tmp = emitir(IRTN(IR_DIV), rb, rc);
-  tmp = emitir(IRTN(IR_FPMATH), tmp, IRFPM_FLOOR);
+  tmp = emitir(IRTN(IR_FPMATH), tmp, IRFPM_TRUNC);
   tmp = emitir(IRTN(IR_MUL), tmp, rc);
   return emitir(IRTN(IR_SUB), rb, tmp);
 }
