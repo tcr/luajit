@@ -471,22 +471,23 @@ function TCR_LOG (...)
   io.stderr:write('\n')
 end
 
--- adds 's' varants
+-- for opcodes with 's' variants encoded in their body, break out
+-- explicit `s` equivalent opcodes that have those bits set to 1
 do
   local addt = {}
   for k,v in pairs(map_op) do
-    local s = k:gsub("([.]?w?)(_%d+)$", "s%1%2")
-    if not match(k, "s_") then -- explicit s_
+    if not match(k, "s_") then -- lacking an explicit 's`
+      -- get each entry
       for i in gmatch(v, "[^:|]+:") do
+        -- schema begins with leading 's'
         if i:sub(1, 1) == 's' then
+          local s = k:gsub("([.]?w?)(_%d+)$", "s%1%2")
           addt[s] = gsub(gsub(gsub(v, "^s", ""), "|s", "|"), "s", "1")
-          if not match(gsub(gsub(v, "^s", ""), "|s", "|"), "s") then
-            map_op[k] = nil
-          end
         end
       end
     end
   end
+
   for k,v in pairs(addt) do
     if not map_op[k] then
       map_op[k] = v
@@ -508,7 +509,7 @@ function tobitstr (num, len)
     return table.concat(t)
 end
 
--- .w is an alias for most non-.w instructions
+-- add .w instructions as an alias for non-.w mneumonics
 do
   for k,v in pairs(map_op) do
     if k:match("[.]w_(%d+)$") then
@@ -527,7 +528,8 @@ do
   local addt = {}
   for cond,c in pairs(map_cond) do
     for k,v in pairs(map_op) do
-      if k ~= 'b_1' and b ~= 'b.w_1' then
+      if k ~= 'b_1' and k ~= 'b.w_1' and k ~= 'bs_1' and k ~= 'bs.w_1' then
+        -- add conditional variants to all instructions.
         local k2 = k
         if match(k, "s_") and not match(v, "s") then
           k2 = k2:gsub("s_", "_")
