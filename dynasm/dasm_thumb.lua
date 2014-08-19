@@ -483,6 +483,12 @@ do
         if i:sub(1, 1) == 's' then
           local s = k:gsub("([.]?w?)(_%d+)$", "s%1%2")
           addt[s] = gsub(gsub(gsub(v, "^s", ""), "|s", "|"), "s", "1")
+
+          -- with the schema 's', flag exists only in non-comment mode,
+          -- so delete original (e.g. lsl becomes lsls)
+          if not match(gsub(gsub(v, "^s", ""), "|s", "|"), "s") then
+            map_op[k] = nil
+          end
         end
       end
     end
@@ -528,17 +534,20 @@ do
   local addt = {}
   for cond,c in pairs(map_cond) do
     for k,v in pairs(map_op) do
-      if k ~= 'b_1' and k ~= 'b.w_1' and k ~= 'bs_1' and k ~= 'bs.w_1' then
-        -- add conditional variants to all instructions.
-        local k2 = k
-        if match(k, "s_") and not match(v, "s") then
-          k2 = k2:gsub("s_", "_")
+      -- movs_2 does not take a <c>
+      if k ~= 'movs_2' then
+        if k ~= 'b_1' and k ~= 'b.w_1' and k ~= 'bs_1' and k ~= 'bs.w_1' then
+          -- add conditional variants to all instructions.
+          local k2 = k
+          if match(k, "s_") and not match(v, "s") then
+            k2 = k2:gsub("s_", "_")
+          end
+          local s = k2:gsub("([.]?w?)(_%d+)$", cond .. "%1%2")
+          addt[s] = '#C' .. cond .. '|' .. k
+        else
+          local s = k:gsub("([.]?w?)(_%d+)$", cond .. "%1%2")
+          addt[s] = v:gsub("cccc", tobitstr(c, 4))
         end
-        local s = k2:gsub("([.]?w?)(_%d+)$", cond .. "%1%2")
-        addt[s] = '#C' .. cond .. '|' .. k
-      else
-        local s = k:gsub("([.]?w?)(_%d+)$", cond .. "%1%2")
-        addt[s] = v:gsub("cccc", tobitstr(c, 4))
       end
     end
   end
