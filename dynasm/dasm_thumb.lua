@@ -115,12 +115,12 @@ local function witreset()
   end
   local mask, maskstr = 0x8, itstate:sub(3)
   while #maskstr > 0 do
-    if maskstr:sub(1,1) == 't' then
+    if maskstr:sub(-1,-1) == 't' then
       mask = shl(itstatecond % 2, 3) + shr(mask, 1)
     else
       mask = shl((itstatecond + 1) % 2, 3) + shr(mask, 1)
     end
-    maskstr = maskstr:sub(2)
+    maskstr = maskstr:sub(1, -2)
   end
   actlist[itstatepos] = 0xbf00 + shl(itstatecond, 4) + mask
   itstate, itstatecond, itstateexplicit = nil, nil, nil
@@ -1142,6 +1142,7 @@ map_op[".template__"] = function(params, template, nparams)
     template = template:sub(6)
 
     -- check that it (or its complement) are pairs, otherwise begin new comparison
+      -- TCR_LOG('state->', 'reset')
     if itstate and shr(cond, 1) ~= shr(itstatecond, 1) then
       witreset()
     end
