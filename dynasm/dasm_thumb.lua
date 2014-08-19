@@ -471,35 +471,24 @@ function TCR_LOG (...)
   io.stderr:write('\n')
 end
 
--- for opcodes with 's' variants encoded in their body, break out
--- explicit `s` equivalent opcodes that have those bits set to 1
-do
-  local addt = {}
-  for k,v in pairs(map_op) do
-    if not match(k, "s_") then -- lacking an explicit 's`
-      -- get each entry
-      for i in gmatch(v, "[^:|]+:") do
-        -- schema begins with leading 's'
-        if i:sub(1, 1) == 's' then
-          local s = k:gsub("([.]?w?)(_%d+)$", "s%1%2")
-          addt[s] = gsub(gsub(gsub(v, "^s", ""), "|s", "|"), "s", "1")
-
-          -- with the schema 's', flag exists only in non-comment mode,
-          -- so delete original (e.g. lsl becomes lsls)
-          if not match(gsub(gsub(v, "^s", ""), "|s", "|"), "s") then
-            map_op[k] = nil
-          end
-        end
-      end
-    end
+function tobitstr (num, len)
+  local t={}
+  len = len or 0
+  while num>0 or len > 0 do
+    rest=num%2
+    table.insert(t,1,rest)
+    num=(num-rest)/2
+    len = len - 1
   end
+  return table.concat(t)
+end
 
-  for k,v in pairs(addt) do
-    if not map_op[k] then
-      map_op[k] = v
-    else
-      map_op[k] = map_op[k] .. '|' .. v
-    end
+function map_add_entry (map, k, v)
+  if not map[k] then
+    map[k] = v
+  else
+    v = gsub(v, '^#C[^|]+|', '')
+    map[k] = map[k] .. '|' .. v
   end
 end
 
@@ -519,7 +508,8 @@ function map_add_conditionals (map, k, v)
   end
 end
 
--- add .w instructions as an alias for non-.w mneumonics
+-- for opcodes with 's' variants encoded in their body, break out
+-- explicit `s` equivalent opcodes that have those bits set to 1
 do
   local addt = {
     ["mov_2"] = "dm:01000110dmmmmddd"
@@ -558,26 +548,19 @@ do
     end
   end
 
--- add conditional variants
-do
-  local addt = {}
-  for cond,c in pairs(map_cond) do
-    for k,v in pairs(map_op) do
-      -- movs_2 does not take a <c>
-      if k ~= 'movs_2' then
-        if k ~= 'b_1' and k ~= 'b.w_1' and k ~= 'bs_1' and k ~= 'bs.w_1' then
-          -- add conditional variants to all instructions.
-          local k2 = k
-          if match(k, "s_") and not match(v, "s") then
-            k2 = k2:gsub("s_", "_")
-          end
-          local s = k2:gsub("([.]?w?)(_%d+)$", cond .. "%1%2")
-          addt[s] = '#C' .. cond .. '|' .. k
-        else
-          local s = k:gsub("([.]?w?)(_%d+)$", cond .. "%1%2")
-          addt[s] = v:gsub("cccc", tobitstr(c, 4))
-        end
-      end
+  -- Adds it* mneumonics.
+  for it in gmatch('it|ite|itt|itee|itet|itte|ittt|iteee|iteet|itete|itett|ittee|ittet|ittte|itttt', "[^|]+") do
+    addt[it .. '_1'] = '#c' .. it
+  end
+
+  -- Map .w as default options.
+
+  map_op = addt
+  addt = {}
+
+  for k,v in pairs(map_op) do
+    if not match(k, ".w") then
+      map_add_entry(addt, gsub(k, ".w", ""), v)
     end
   end
   for k,v in pairs(map_op) do
@@ -1161,7 +1144,6 @@ map_op[".template__"] = function(params, template, nparams)
     template = template:sub(6)
 
     -- check that it (or its complement) are pairs, otherwise begin new comparison
-      -- TCR_LOG('state->', 'reset')
     if itstate and shr(cond, 1) ~= shr(itstatecond, 1) then
       witreset()
     end
