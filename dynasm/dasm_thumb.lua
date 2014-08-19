@@ -1144,6 +1144,7 @@ map_op[".template__"] = function(params, template, nparams)
     template = template:sub(6)
 
     -- check that it (or its complement) are pairs, otherwise begin new comparison
+      -- TCR_LOG('state->', 'reset')
     if itstate and shr(cond, 1) ~= shr(itstatecond, 1) then
       witreset()
     end
