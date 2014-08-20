@@ -2986,29 +2986,23 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   ins_next2
 #if LJ_COLONY
     |  checktp CARG1, LJ_TISNUM
-    |   bhi >2
-    |  checktp CARG1, LJ_TISNUM
-    |   beq >1
-    |  mvn CARG1, CARG1
-    |  cmn CARG1, #2
-    |   b >4
-    |1:
+    |  bne >1
     |  ldr CARG1, [RC]
     |  mvn CARG1, CARG1
     |  cmn CARG1, #2
-    |  b >4
-    |2:
-    |  checkstr CARG1, >3
+    |  b >3
+    |1:
+    |  checkstr CARG1, >2
     | // TODO these can be flattened:
     |  ldr CARG1, [RC]
     |  ldr CARG1, STR:CARG1->len
     |  mvn CARG1, CARG1
     |  cmn CARG1, #2
-    |  b >4
+    |  b >3
 #endif
-    |3:
+    |2:
     |  checktp CARG1, LJ_TTRUE
-    |4:
+    |3:
     |  mvnls CARG2, #~LJ_TFALSE
     |  mvnhi CARG2, #~LJ_TTRUE
     |  str CARG2, [RA, #4]
