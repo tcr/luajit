@@ -296,7 +296,6 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
 {
   MMS mm = bcmode_mm(op);
   TValue tempb;
-#if !LJ_COLONY
   TValue tempc;
   cTValue *b, *c;
   if ((b = str2num(rb, &tempb)) != NULL &&
@@ -304,7 +303,6 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
     setnumV(ra, lj_vm_foldarith(numV(b), numV(c), (int)mm-MM_add));
     return NULL;
   } else {
-#endif
     cTValue *mo = lj_meta_lookup(L, rb, mm);
     if (tvisnil(mo)) {
       mo = lj_meta_lookup(L, rc, mm);
@@ -315,9 +313,7 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
       }
     }
     return mmcall(L, lj_cont_ra, mo, rb, rc);
-#if !LJ_COLONY
   }
-#endif
 }
 
 /* In-place coercion of a number to a string. */
