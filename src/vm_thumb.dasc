@@ -2898,19 +2898,33 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ldrd CARG1, CARG2, [RC]
     |   add PC, PC, #4
     |   add RB, PC, RB, lsl #2
-    |  checktp CARG2, LJ_TTRUE
+#if LJ_COLONY
+    |  checktp CARG2, LJ_TISNUM
+    |  bne >1
+    |  mvn CARG3, CARG1
+    |  cmn CARG3, #2
+    |  b >3
+    |1:
+    |  checkstr CARG2, >2
+    |  ldr CARG3, STR:CARG1->len
+    |  mvn CARG3, CARG3
+    |  cmn CARG3, #2
+    |  b >3
+#endif
+    |2:
+    |  checktp CARG2, LJ_TTRUE  
+    |3:
     if (op == BC_ISTC || op == BC_IST) {
       |  subls PC, RB, #0x20000
       if (op == BC_ISTC) {
-  |  // strdls CARG1, CARG2, [BASE, RA]
-	|  strdls_i CARG1, CARG2, BASE, RA
+        |  // strdls CARG1, CARG2, [BASE, RA]
+        |  strdls_i CARG1, CARG2, BASE, RA
       }
     } else {
-      |  it hi
       |  subhi PC, RB, #0x20000
       if (op == BC_ISFC) {
-  |  // strdhi CARG1, CARG2, [BASE, RA]
-	|  strdhi_i CARG1, CARG2, BASE, RA
+        |  // strdhi CARG1, CARG2, [BASE, RA]
+        |  strdhi_i CARG1, CARG2, BASE, RA
       }
     }
     |  ins_next
