@@ -2928,17 +2928,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   add RB, PC, RB, lsl #2
 #if LJ_COLONY
     |  checktp CARG2, LJ_TISNUM
-    |   bhi >5
-    |  checktp CARG2, LJ_TISNUM
-    |   beq >4
-    |  mvn CARG3, CARG2
-    |  cmn CARG3, #2
-    |  b >3
-    |4:
+    |  bne >1
     |  mvn CARG3, CARG1
     |  cmn CARG3, #2
     |  b >3
-    |5:
+    |1:
     |  checkstr CARG2, >2
     |  ldr CARG3, STR:CARG1->len
     |  mvn CARG3, CARG3
