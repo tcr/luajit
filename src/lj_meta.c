@@ -125,6 +125,32 @@ static TValue *mmcall(lua_State *L, ASMFunction cont, cTValue *mo,
 /* Helper for TGET*. __index chain and metamethod. */
 cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
 {
+#if LJ_COLONY
+  TValue tmp;
+  if (tvisstr(k)) {
+    int i = 0;
+    for (; i < strV(k)->len; i++) {
+      if (!(strVdata(k)[i] >= '0' && strVdata(k)[i] <= '9')) {
+        break;
+      }
+    }
+    if (i == strV(k)->len && (strVdata(k)[0] != '0' || strV(k)->len == 1)) {
+      char* end;
+      setnumV(&tmp, strtol(strVdata(k), &end, 10));
+      k = &tmp;
+    }
+  } else if (tvisnumber(k) && tvisnan(k)) {
+    setstrV(L, &tmp, lj_str_fromnumber(L, k));
+    k = &tmp;
+  } else if (tvisnil(k)) {
+    setstrV(L, &tmp, lj_str_newz(L, "null"));
+    k = &tmp;
+  } else if (tvisbool(k)) {
+    setstrV(L, &tmp, lj_str_newz(L, boolV(k) ? "true" : "false"));
+    k = &tmp;
+  }
+  // TODO tostring tables
+#endif
   int loop;
   for (loop = 0; loop < LJ_MAX_IDXCHAIN; loop++) {
     cTValue *mo;
@@ -152,6 +178,31 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
 TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k)
 {
   TValue tmp;
+#if LJ_COLONY
+  if (tvisstr(k)) {
+    int i = 0;
+    for (; i < strV(k)->len; i++) {
+      if (!(strVdata(k)[i] >= '0' && strVdata(k)[i] <= '9')) {
+        break;
+      }
+    }
+    if (i == strV(k)->len && (strVdata(k)[0] != '0' || strV(k)->len == 1)) {
+      char* end;
+      setnumV(&tmp, strtol(strVdata(k), &end, 10));
+      k = &tmp;
+    }
+  } else if (tvisnumber(k) && tvisnan(k)) {
+    setstrV(L, &tmp, lj_str_fromnumber(L, k));
+    k = &tmp;
+  } else if (tvisnil(k)) {
+    setstrV(L, &tmp, lj_str_newz(L, "null"));
+    k = &tmp;
+  } else if (tvisbool(k)) {
+    setstrV(L, &tmp, lj_str_newz(L, boolV(k) ? "true" : "false"));
+    k = &tmp;
+  }
+  // TODO tostring tables
+#endif
   int loop;
   for (loop = 0; loop < LJ_MAX_IDXCHAIN; loop++) {
     cTValue *mo;
@@ -194,8 +245,10 @@ static cTValue *str2num(cTValue *o, TValue *n)
     return o;
   else if (tvisint(o))
     return (setnumV(n, (lua_Number)intV(o)), n);
+#if !LJ_COLONY
   else if (tvisstr(o) && lj_strscan_num(strV(o), n))
     return n;
+#endif
   else
     return NULL;
 }
@@ -205,7 +258,8 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
 		      BCReg op)
 {
   MMS mm = bcmode_mm(op);
-  TValue tempb, tempc;
+  TValue tempb;
+  TValue tempc;
   cTValue *b, *c;
   if ((b = str2num(rb, &tempb)) != NULL &&
       (c = str2num(rc, &tempc)) != NULL) {  /* Try coercion first. */
@@ -386,7 +440,7 @@ TValue *lj_meta_comp(lua_State *L, cTValue *o1, cTValue *o2, int op)
     cTValue *mo = lj_meta_lookup(L, tviscdata(o1) ? o1 : o2, mm);
     if (LJ_UNLIKELY(tvisnil(mo))) goto err;
     return mmcall(L, cont, mo, o1, o2);
-  } else if (LJ_52 || itype(o1) == itype(o2)) {
+  } else if (LJ_52 || LJ_COLONY || itype(o1) == itype(o2)) {
     /* Never called with two numbers. */
     if (tvisstr(o1) && tvisstr(o2)) {
       int32_t res = lj_str_cmp(strV(o1), strV(o2));
@@ -397,7 +451,7 @@ TValue *lj_meta_comp(lua_State *L, cTValue *o1, cTValue *o2, int op)
 	ASMFunction cont = (op & 1) ? lj_cont_condf : lj_cont_condt;
 	MMS mm = (op & 2) ? MM_le : MM_lt;
 	cTValue *mo = lj_meta_lookup(L, o1, mm);
-#if LJ_52
+#if LJ_52 || LJ_COLONY
 	if (tvisnil(mo) && tvisnil((mo = lj_meta_lookup(L, o2, mm))))
 #else
 	cTValue *mo2 = lj_meta_lookup(L, o2, mm);
