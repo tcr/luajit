@@ -126,7 +126,7 @@ static TValue *mmcall(lua_State *L, ASMFunction cont, cTValue *mo,
 cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
 {
   TValue tmp;
-#if 0
+#if LJ_COLONY
   if (tvisstr(k)) {
     int i = 0;
     for (; i < strV(k)->len; i++) {
@@ -139,7 +139,7 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
       setnumV(&tmp, strtol(strVdata(k), &end, 10));
       k = &tmp;
     }
-  } else if (tvisnumber(k) && tvisnan(k)) {
+  } else if (tvisnumber(k) && !tvisint(k)) {
     setstrV(L, &tmp, lj_str_fromnumber(L, k));
     k = &tmp;
   } else if (tvisnil(k)) {
@@ -178,7 +178,7 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
 TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k)
 {
   TValue tmp;
-#if 0
+#if LJ_COLONY
   if (tvisstr(k)) {
     int i = 0;
     for (; i < strV(k)->len; i++) {
@@ -191,7 +191,7 @@ TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k)
       setnumV(&tmp, strtol(strVdata(k), &end, 10));
       k = &tmp;
     }
-  } else if (tvisnumber(k) && tvisnan(k)) {
+  } else if (tvisnumber(k) && !tvisint(k)) {
     setstrV(L, &tmp, lj_str_fromnumber(L, k));
     k = &tmp;
   } else if (tvisnil(k)) {
