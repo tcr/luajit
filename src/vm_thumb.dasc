@@ -3542,6 +3542,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   // ldrd CARG3, CARG4, [BASE, RC]
     |   ldrd_i CARG3, CARG4, BASE, RC
     |  checktab CARG2, ->vmeta_tgetv  // STALL: load CARG12.
+    |->vm_tgetn:
     |   checktp CARG4, LJ_TISNUM	// Integer key?
     |  ldreq CARG4, TAB:CARG1->array
     |    ldreq CARG2, TAB:CARG1->asize
@@ -3572,9 +3573,53 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |
     |9:
     |  checktp CARG4, LJ_TSTR		// String key?
+#if LJ_COLONY
+    |   bne ->vmeta_tgetv
+    |  mov STR:RC, CARG3
+    |
+    |  // check length
+    |  ldr CARG4, STR:RC->len
+    |  cmp CARG4, #0
+    |   beq ->BC_TGETS_Z // zero Zero-length
+    |
+    |  // CARG1 = pointer
+    |  // CARG2 = char loader
+    |  // CARG3 = decimal counter
+    |  // CARG4 = len counter
+    |  // RC = raw string dat apointer
+    |
+    |  // check if string is integer
+    |  add RC, CARG3, #sizeof(struct GCstr)
+    |  add CARG1, CARG3, #sizeof(struct GCstr)
+    |  add RC, RC, CARG4
+    |  mov.w CARG3, #0
+    |5:
+    |  ldrb CARG2, [CARG1]
+    |  sub CARG2, CARG2, #48
+    |  cmp CARG2, #9
+    |   bhi >6
+    |  add CARG3, CARG3, CARG3, lsl #2
+    |  lsl CARG3, CARG3, #1
+    |  add CARG3, CARG2, CARG3
+    |  add CARG1, CARG1, #1
+    |  cmp CARG1, RC
+    |   bne <5
+    |  mvn CARG4, #~LJ_TISNUM
+    |  ldrd_i TAB:CARG1, TAB:CARG2, BASE, RB
+    |   decode_RC8 RC, INS
+    |  b ->vm_tgetn
+    |
+    |6:
+    |   decode_RC8 RC, INS
+    |   ldrd_i CARG3, CARG4, BASE, RC
+    |  ldrd_i TAB:CARG1, TAB:CARG2, BASE, RB
+    |   mov RC, CARG3
+    |  b ->BC_TGETS_Z
+#else
     |   moveq STR:RC, CARG3
     |  beq ->BC_TGETS_Z
     |  b ->vmeta_tgetv
+#endif
     break;
   case BC_TGETS:
     |  decode_RB8 RB, INS
@@ -3668,6 +3713,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   // ldrd CARG3, CARG4, [BASE, RC]
     |   ldrd_i CARG3, CARG4, BASE, RC
     |  checktab CARG2, ->vmeta_tsetv  // STALL: load CARG12.
+    |->vm_tsetn:
     |   checktp CARG4, LJ_TISNUM	// Integer key?
     |  ldreq CARG2, TAB:CARG1->array
     |    ldreq CARG4, TAB:CARG1->asize
@@ -3708,10 +3754,54 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  b <2
     |
     |9:
-    |  checktp CARG4, LJ_TSTR		// String key?
+    |  checktp CARG4, LJ_TSTR   // String key?
+#if LJ_COLONY
+    |   bne ->vmeta_tsetv
+    |  mov STR:RC, CARG3
+    |
+    |  // check length
+    |  ldr CARG4, STR:RC->len
+    |  cmp CARG4, #0
+    |   beq ->BC_TSETS_Z // zero Zero-length
+    |
+    |  // CARG1 = pointer
+    |  // CARG2 = char loader
+    |  // CARG3 = decimal counter
+    |  // CARG4 = len counter
+    |  // RC = raw string dat apointer
+    |
+    |  // check if string is integer
+    |  add RC, CARG3, #sizeof(struct GCstr)
+    |  add CARG1, CARG3, #sizeof(struct GCstr)
+    |  add RC, RC, CARG4
+    |  mov.w CARG3, #0
+    |5:
+    |  ldrb CARG2, [CARG1]
+    |  sub CARG2, CARG2, #48
+    |  cmp CARG2, #9
+    |   bhi >6
+    |  add CARG3, CARG3, CARG3, lsl #2
+    |  lsl CARG3, CARG3, #1
+    |  add CARG3, CARG2, CARG3
+    |  add CARG1, CARG1, #1
+    |  cmp CARG1, RC
+    |   bne <5
+    |  mvn CARG4, #~LJ_TISNUM
+    |  ldrd_i TAB:CARG1, TAB:CARG2, BASE, RB
+    |   decode_RC8 RC, INS
+    |  b ->vm_tsetn
+    |
+    |6:
+    |   decode_RC8 RC, INS
+    |   ldrd_i CARG3, CARG4, BASE, RC
+    |  ldrd_i TAB:CARG1, TAB:CARG2, BASE, RB
+    |   mov RC, CARG3
+    |  b ->BC_TSETS_Z
+#else
     |   moveq STR:RC, CARG3
     |  beq ->BC_TSETS_Z
     |  b ->vmeta_tsetv
+#endif
     break;
   case BC_TSETS:
     |  decode_RB8 RB, INS
