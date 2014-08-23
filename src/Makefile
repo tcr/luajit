@@ -218,6 +218,9 @@ else
 ifneq (,$(findstring LJ_TARGET_X86 ,$(TARGET_TESTARCH)))
   TARGET_LJARCH= x86
 else
+ifneq (,$(findstring LJ_TARGET_THUMB ,$(TARGET_TESTARCH)))
+  TARGET_LJARCH= thumb
+else
 ifneq (,$(findstring LJ_TARGET_ARM ,$(TARGET_TESTARCH)))
   TARGET_LJARCH= arm
 else
@@ -234,6 +237,7 @@ ifneq (,$(findstring LJ_TARGET_MIPS ,$(TARGET_TESTARCH)))
   TARGET_LJARCH= mips
 else
   $(error Unsupported target architecture)
+endif
 endif
 endif
 endif
