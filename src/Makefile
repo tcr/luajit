@@ -442,6 +442,7 @@ endif
 endif
 endif
 endif
+endif
 
 DASM_FLAGS= $(DASM_XFLAGS) $(DASM_AFLAGS)
 DASM_DASC= vm_$(DASM_ARCH).dasc
