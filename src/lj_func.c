@@ -12,6 +12,7 @@
 #include "lj_obj.h"
 #include "lj_gc.h"
 #include "lj_func.h"
+#include "lj_tab.h"
 #include "lj_trace.h"
 #include "lj_vm.h"
 
@@ -113,6 +114,8 @@ GCfunc *lj_func_newC(lua_State *L, MSize nelems, GCtab *env)
   /* NOBARRIER: The GCfunc is new (marked white). */
   setmref(fn->c.pc, &G(L)->bc_cfunc_ext);
   setgcref(fn->c.env, obj2gco(env));
+  /* Function table */
+  setgcrefnull(fn->c.tab);
   return fn;
 }
 
@@ -129,6 +132,8 @@ static GCfunc *func_newL(lua_State *L, GCproto *pt, GCtab *env)
   /* Saturating 3 bit counter (0..7) for created closures. */
   count = (uint32_t)pt->flags + PROTO_CLCOUNT;
   pt->flags = (uint8_t)(count - ((count >> PROTO_CLC_BITS) & PROTO_CLCOUNT));
+  /* Function table */
+  setgcref(fn->c.tab, obj2gco(lj_tab_new(L, 0, 0)));
   return fn;
 }
 
