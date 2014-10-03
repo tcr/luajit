@@ -1,4 +1,4 @@
-print('1..5')
+print('1..9')
 
 function go ()
 	local f = function () end
@@ -44,4 +44,14 @@ debug.setmetatable(function () end, {
 test.newok2 = 'not ok'
 
 print(rawget(test, 'ok'), 'rawget works')
--- TODO rawget?
+print(rawget(test, 'undef') == nil and 'ok' or 'not ok', 'rawget with nil works')
+
+debug.setmetatable(function () end, {
+	__newindex = function (ths, key, value)
+		print('not ok')
+	end
+})
+rawset(test, 'newthing', 'ok')
+print(test.newthing, 'rawset doesnt throw not ok')
+rawset(test, 'newthing', 'ok')
+print(test.newthing, 'rawset doesnt throw not ok on reassign')
