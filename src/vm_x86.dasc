@@ -1458,6 +1458,12 @@ static void build_subroutines(BuildCtx *ctx)
   |  jmp ->fff_res1
   |
   |.ffunc_2 rawget
+  |  cmp dword [BASE+4], LJ_TFUNC;  jne >1
+  |  mov LFUNC:RB, [BASE]
+  |  mov LFUNC:RB, LFUNC:RB->tab
+  |  mov [BASE], LFUNC:RB
+  |  mov dword [BASE+4], LJ_TTAB  // Store metatable as default result.
+  |1:
   |  cmp dword [BASE+4], LJ_TTAB;  jne ->fff_fallback
   |.if X64WIN
   |  mov RB, BASE			// Save BASE.

@@ -221,9 +221,14 @@ GCfunc *lj_lib_checkfunc(lua_State *L, int narg)
 GCtab *lj_lib_checktab(lua_State *L, int narg)
 {
   TValue *o = L->base + narg-1;
-  if (!(o < L->top && tvistab(o)))
-    lj_err_argt(L, narg, LUA_TTABLE);
-  return tabV(o);
+  if (o < L->top) {
+    if (tvistab(o))
+      return tabV(o);
+    else if (tvisfunc(o))
+      return tabref(funcV(o)->c.tab);
+  }
+  lj_err_arg(L, narg, LJ_ERR_NOTABN);
+  return NULL;  /* unreachable */
 }
 
 GCtab *lj_lib_checktabornil(lua_State *L, int narg)
@@ -232,6 +237,8 @@ GCtab *lj_lib_checktabornil(lua_State *L, int narg)
   if (o < L->top) {
     if (tvistab(o))
       return tabV(o);
+    else if (tvisfunc(o))
+      return tabref(funcV(o)->c.tab);
     else if (tvisnil(o))
       return NULL;
   }
