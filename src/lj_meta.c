@@ -127,6 +127,10 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
 {
 #if LJ_COLONY
   TValue tmp;
+  if (tvisfunc(o) && gcref(funcV(o)->c.tab)) {
+    setgcV(L, &tmp, gcref(funcV(o)->c.tab), LJ_TTAB);
+    return lj_meta_tget(L, &tmp, k);
+  }
   if (tvisstr(k)) {
     int i = 0;
     for (; i < strV(k)->len; i++) {
@@ -179,6 +183,10 @@ TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k)
 {
   TValue tmp;
 #if LJ_COLONY
+  if (tvisfunc(o) && gcref(funcV(o)->c.tab)) {
+    setgcV(L, &tmp, gcref(funcV(o)->c.tab), LJ_TTAB);
+    return lj_meta_tset(L, &tmp, k);
+  }
   if (tvisstr(k)) {
     int i = 0;
     for (; i < strV(k)->len; i++) {
