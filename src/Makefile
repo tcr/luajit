@@ -243,6 +243,7 @@ endif
 endif
 endif
 endif
+endif
 
 ifneq (,$(findstring LJ_TARGET_PS3 1,$(TARGET_TESTARCH)))
   TARGET_SYS= PS3
@@ -437,7 +438,6 @@ ifeq (ppc,$(TARGET_LJARCH))
   ifeq (PS3,$(TARGET_SYS))
     DASM_AFLAGS+= -D PPE -D TOC
   endif
-endif
 endif
 endif
 endif
