@@ -1,4 +1,4 @@
-print('1..9')
+print('1..10')
 
 function go ()
 	local f = function () end
@@ -55,3 +55,10 @@ rawset(test, 'newthing', 'ok')
 print(test.newthing, 'rawset doesnt throw not ok')
 rawset(test, 'newthing', 'ok')
 print(test.newthing, 'rawset doesnt throw not ok on reassign')
+
+
+-- bug test
+debug.setmetatable(function () end, nil)
+function noise () end
+noise.ok = 5
+print(next(noise, nil), 'next should not freeze, should return first key')

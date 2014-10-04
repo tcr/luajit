@@ -50,10 +50,17 @@ void lj_dispatch_init(GG_State *GG)
 {
   uint32_t i;
   ASMFunction *disp = GG->dispatch;
+#if LJ_TARGET_THUMB
+  for (i = 0; i < GG_LEN_SDISP; i++)
+    disp[GG_LEN_DDISP+i] = disp[i] = makeasmfunc(lj_bc_ofs[i]);
+  for (i = GG_LEN_SDISP; i < GG_LEN_DDISP; i++)
+    disp[i] = makeasmfunc(lj_bc_ofs[i])+1;
+#else
   for (i = 0; i < GG_LEN_SDISP; i++)
     disp[GG_LEN_DDISP+i] = disp[i] = makeasmfunc(lj_bc_ofs[i]);
   for (i = GG_LEN_SDISP; i < GG_LEN_DDISP; i++)
     disp[i] = makeasmfunc(lj_bc_ofs[i]);
+#endif
   /* The JIT engine is off by default. luaopen_jit() turns it on. */
   disp[BC_FORL] = disp[BC_IFORL];
   disp[BC_ITERL] = disp[BC_IITERL];
