@@ -34,7 +34,7 @@ CC= gcc
 # to slow down the C part by not omitting it. Debugging, tracebacks and
 # unwinding are not affected -- the assembler part has frame unwind
 # information and GCC emits it where needed (x64) or with -g (see CCDEBUG).
-CCOPT= -O0 -fomit-frame-pointer
+CCOPT= -O2 -fomit-frame-pointer
 # Use this if you want to generate a smaller binary (but it's slower):
 #CCOPT= -Os -fomit-frame-pointer
 # Note: it's no longer recommended to use -O3 with GCC 4.x.
@@ -72,10 +72,10 @@ CCWARN= -Wall
 # as dynamic mode.
 #
 # Mixed mode creates a static + dynamic library and a statically linked luajit.
-#BUILDMODE= mixed
+BUILDMODE= mixed
 #
 # Static mode creates a static library and a statically linked luajit.
-BUILDMODE= static
+# BUILDMODE= static
 #
 # Dynamic mode creates a dynamic library and a dynamically linked luajit.
 # Note: this executable will only run when the library is installed!

@@ -1557,6 +1557,12 @@ static void build_subroutines(BuildCtx *ctx)
   |.ffunc_1 next
   |  je >2				// Missing 2nd arg?
   |1:
+  |  cmp dword [BASE+4], LJ_TFUNC;  jne >4
+  |  mov LFUNC:RB, [BASE]
+  |  mov LFUNC:RB, LFUNC:RB->tab
+  |  mov [BASE], LFUNC:RB
+  |  mov dword [BASE+4], LJ_TTAB  // Store metatable as default result.
+  |4:
   |  cmp dword [BASE+4], LJ_TTAB;  jne ->fff_fallback
   |  mov L:RB, SAVE_L
   |  mov L:RB->base, BASE		// Add frame since C call can throw.
