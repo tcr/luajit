@@ -499,13 +499,13 @@ typedef struct GCState {
   GCRef root;		/* List of all collectable objects. */
   MRef sweep;		/* Sweep position in root list. */
   GCRef gray;		/* List of gray objects. */
-  GCRef grayagain;	/* List of objects for atomic traversal. */
   GCRef weak;		/* List of weak tables (to be cleared). */
   GCRef mmudata;	/* List of userdata (to be finalized). */
   MSize stepmul;	/* Incremental GC step granularity. */
   MSize debt;		/* Debt (how much GC is behind schedule). */
   MSize estimate;	/* Estimate of memory actually in use. */
   MSize pause;		/* Pause between successive GC cycles. */
+  GCRef grayagain;  /* List of objects for atomic traversal. */
 } GCState;
 
 /* Global state, shared by all threads of a Lua universe. */
@@ -515,30 +515,30 @@ typedef struct global_State {
   MSize strnum;		/* Number of strings in hash table. */
   lua_Alloc allocf;	/* Memory allocator. */
   void *allocd;		/* Memory allocator data. */
-  GCState gc;		/* Garbage collector. */
-  SBuf tmpbuf;		/* Temporary buffer for string concatenation. */
   Node nilnode;		/* Fallback 1-element hash part (nil key and value). */
   GCstr strempty;	/* Empty string. */
   uint8_t stremptyz;	/* Zero terminator of empty string. */
-  uint8_t hookmask;	/* Hook mask. */
   uint8_t dispatchmode;	/* Dispatch mode. */
   uint8_t vmevmask;	/* VM event mask. */
   GCRef mainthref;	/* Link to main thread. */
   TValue registrytv;	/* Anchor for registry. */
   TValue tmptv, tmptv2;	/* Temporary TValues. */
   GCupval uvhead;	/* Head of double-linked list of all open upvalues. */
-  int32_t hookcount;	/* Instruction hook countdown. */
-  int32_t hookcstart;	/* Start count for instruction hook counter. */
-  lua_Hook hookf;	/* Hook function. */
-  lua_CFunction wrapf;	/* Wrapper for C function calls. */
   lua_CFunction panic;	/* Called as a last resort for errors. */
-  volatile int32_t vmstate;  /* VM state or current JIT code trace number. */
   BCIns bc_cfunc_int;	/* Bytecode for internal C function calls. */
   BCIns bc_cfunc_ext;	/* Bytecode for external C function calls. */
   GCRef jit_L;		/* Current JIT code lua_State or NULL. */
   MRef jit_base;	/* Current JIT code L->base. */
   MRef ctype_state;	/* Pointer to C type state. */
   GCRef gcroot[GCROOT_MAX];  /* GC roots. */
+  volatile int32_t vmstate;  /* VM state or current JIT code trace number. */
+  lua_CFunction wrapf;  /* Wrapper for C function calls. */
+  lua_Hook hookf; /* Hook function. */
+  SBuf tmpbuf;    /* Temporary buffer for string concatenation. */
+  uint8_t hookmask; /* Hook mask. */
+  int32_t hookcount;  /* Instruction hook countdown. */
+  int32_t hookcstart; /* Start count for instruction hook counter. */
+  GCState gc;   /* Garbage collector. */
 } global_State;
 
 #define mainthread(g)	(&gcref(g->mainthref)->th)
