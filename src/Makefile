@@ -577,7 +577,13 @@ E= @echo
 # Make targets.
 ##############################################################################
 
-default all:	$(TARGET_T)
+ifeq (thumb,$(LJ_TARGET_THUMB))
+	TARGET_Z=	$(TARGET_O)
+else
+	TARGET_Z=	$(TARGET_T)
+endif
+
+default all: $(TARGET_Z)
 
 amalg:
 	@grep "^[+|]" ljamalg.c
