@@ -125,14 +125,8 @@ static TValue *mmcall(lua_State *L, ASMFunction cont, cTValue *mo,
 /* Helper for TGET*. __index chain and metamethod. */
 cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
 {
-#if LJ_COLONY
   TValue tmp;
-  if (tvisfunc(o) && gcref(funcV(o)->c.tab)) {
-    cTValue *tv = lj_tab_get(L, tabref(funcV(o)->c.tab), k);
-    if (!tvisnil(tv) || !(lj_meta_fast(L, tabref(basemt_obj(G(L), o)), MM_index))) {
-      return tv;
-    }
-  }
+#if LJ_COLONY
   if (tvisstr(k)) {
     int i = 0;
     for (; i < strV(k)->len; i++) {
@@ -145,7 +139,7 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
       setnumV(&tmp, strtol(strVdata(k), &end, 10));
       k = &tmp;
     }
-  } else if (tvisnumber(k) && tvisnan(k)) {
+  } else if (tvisnumber(k) && !tvisint(k)) {
     setstrV(L, &tmp, lj_str_fromnumber(L, k));
     k = &tmp;
   } else if (tvisnil(k)) {
@@ -185,13 +179,6 @@ TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k)
 {
   TValue tmp;
 #if LJ_COLONY
-  if (tvisfunc(o) && gcref(funcV(o)->c.tab)) {
-    cTValue *tv = lj_tab_get(L, tabref(funcV(o)->c.tab), k);
-    if (!tvisnil(tv) || !(lj_meta_fast(L, tabref(basemt_obj(G(L), o)), MM_newindex))) {
-      setgcV(L, &tmp, gcref(funcV(o)->c.tab), LJ_TTAB);
-      return lj_meta_tset(L, &tmp, k);
-    }
-  }
   if (tvisstr(k)) {
     int i = 0;
     for (; i < strV(k)->len; i++) {
@@ -204,7 +191,7 @@ TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k)
       setnumV(&tmp, strtol(strVdata(k), &end, 10));
       k = &tmp;
     }
-  } else if (tvisnumber(k) && tvisnan(k)) {
+  } else if (tvisnumber(k) && !tvisint(k)) {
     setstrV(L, &tmp, lj_str_fromnumber(L, k));
     k = &tmp;
   } else if (tvisnil(k)) {
@@ -258,8 +245,10 @@ static cTValue *str2num(cTValue *o, TValue *n)
     return o;
   else if (tvisint(o))
     return (setnumV(n, (lua_Number)intV(o)), n);
+#if !LJ_COLONY
   else if (tvisstr(o) && lj_strscan_num(strV(o), n))
     return n;
+#endif
   else
     return NULL;
 }
@@ -270,7 +259,6 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
 {
   MMS mm = bcmode_mm(op);
   TValue tempb;
-#if !LJ_COLONY
   TValue tempc;
   cTValue *b, *c;
   if ((b = str2num(rb, &tempb)) != NULL &&
@@ -278,7 +266,6 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
     setnumV(ra, lj_vm_foldarith(numV(b), numV(c), (int)mm-MM_add));
     return NULL;
   } else {
-#endif
     cTValue *mo = lj_meta_lookup(L, rb, mm);
     if (tvisnil(mo)) {
       mo = lj_meta_lookup(L, rc, mm);
@@ -289,9 +276,7 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
       }
     }
     return mmcall(L, lj_cont_ra, mo, rb, rc);
-#if !LJ_COLONY
   }
-#endif
 }
 
 /* In-place coercion of a number to a string. */
