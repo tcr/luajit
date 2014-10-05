@@ -1078,8 +1078,17 @@ static void build_subroutines(BuildCtx *ctx)
   |  ldrd CARG3, CARG4, [BASE]
   |   cmp NARGS8:RC, #16
   |   blo ->fff_fallback
+#ifdef LJ_COLONY
+  |  checkfunc CARG4, >1
+  |   ldr CARG2, LFUNC:CARG3->tab
+  |  b >2
+  |1:
+#endif
   |   mov CARG2, CARG3
   |  checktab CARG4, ->fff_fallback
+#ifdef LJ_COLONY
+  |2:
+#endif
   |   mov CARG1, L
   |   add CARG3, BASE, #8
   |  .IOS mov RA, BASE
@@ -1125,7 +1134,16 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.ffunc_1 next
   |   mvn CARG4, #~LJ_TNIL
+#ifdef LJ_COLONY
+  |  checkfunc CARG2, >1
+  |   ldr CARG1, LFUNC:CARG1->tab
+  |  b >2
+  |1:
+#endif
   |  checktab CARG2, ->fff_fallback
+#ifdef LJ_COLONY
+  |2:
+#endif
   |   // strd CARG3, CARG4, [BASE, NARGS8:RC]  // Set missing 2nd arg to nil.
   |   strd_i CARG3, CARG4, BASE, NARGS8:RC	// Set missing 2nd arg to nil.
   |   ldr PC, [BASE, FRAME_PC]
