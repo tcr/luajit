@@ -145,7 +145,7 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
       setnumV(&tmp, strtol(strVdata(k), &end, 10));
       k = &tmp;
     }
-  } else if (tvisnumber(k) && tvisnan(k)) {
+  } else if (tvisnum(k) && tvisnan(k)) {
     setstrV(L, &tmp, lj_str_fromnumber(L, k));
     k = &tmp;
   } else if (tvisnil(k)) {
@@ -204,7 +204,7 @@ TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k)
       setnumV(&tmp, strtol(strVdata(k), &end, 10));
       k = &tmp;
     }
-  } else if (tvisnumber(k) && tvisnan(k)) {
+  } else if (tvisnum(k) && tvisnan(k)) {
     setstrV(L, &tmp, lj_str_fromnumber(L, k));
     k = &tmp;
   } else if (tvisnil(k)) {
