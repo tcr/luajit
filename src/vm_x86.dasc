@@ -1458,12 +1458,19 @@ static void build_subroutines(BuildCtx *ctx)
   |  jmp ->fff_res1
   |
   |.ffunc_2 rawget
+#if LJ_COLONY
   |  cmp dword [BASE+4], LJ_TFUNC;  jne >1
   |  mov LFUNC:RB, [BASE]
   |  mov LFUNC:RB, LFUNC:RB->tab
+  |  cmp LFUNC:RB, 0; jne >2
+  |  mov PC, [BASE-4]
+  |  mov dword [BASE-4], LJ_TNIL    // Return original table.
+  |  jmp ->fff_res1
+  |2:
   |  mov [BASE], LFUNC:RB
   |  mov dword [BASE+4], LJ_TTAB  // Store metatable as default result.
   |1:
+#endif
   |  cmp dword [BASE+4], LJ_TTAB;  jne ->fff_fallback
   |.if X64WIN
   |  mov RB, BASE			// Save BASE.
@@ -1556,13 +1563,19 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.ffunc_1 next
   |  je >2				// Missing 2nd arg?
-  |1:
-  |  cmp dword [BASE+4], LJ_TFUNC;  jne >4
+#if LJ_COLONY
+  |  cmp dword [BASE+4], LJ_TFUNC;  jne >5
   |  mov LFUNC:RB, [BASE]
   |  mov LFUNC:RB, LFUNC:RB->tab
+  |  cmp LFUNC:RB, 0; jne >4
+  |  mov PC, [BASE-4]
+  |  mov dword [BASE-4], LJ_TNIL    // Return original table.
+  |  jmp ->fff_res1
+  |4:
   |  mov [BASE], LFUNC:RB
   |  mov dword [BASE+4], LJ_TTAB  // Store metatable as default result.
-  |4:
+  |5:
+#endif
   |  cmp dword [BASE+4], LJ_TTAB;  jne ->fff_fallback
   |  mov L:RB, SAVE_L
   |  mov L:RB->base, BASE		// Add frame since C call can throw.
