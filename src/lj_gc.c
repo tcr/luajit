@@ -212,6 +212,8 @@ static void gc_traverse_func(global_State *g, GCfunc *fn)
       gc_markobj(g, &gcref(fn->l.uvptr[i])->uv);
   } else {
     uint32_t i;
+    gc_markobj(g, tabref(fn->c.tab));
+    gc_traverse_tab(g, tabref(fn->c.tab));
     for (i = 0; i < fn->c.nupvalues; i++)  /* Mark C function upvalues. */
       gc_marktv(g, &fn->c.upvalue[i]);
   }

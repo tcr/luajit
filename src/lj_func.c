@@ -115,7 +115,7 @@ GCfunc *lj_func_newC(lua_State *L, MSize nelems, GCtab *env)
   setmref(fn->c.pc, &G(L)->bc_cfunc_ext);
   setgcref(fn->c.env, obj2gco(env));
   /* Function table */
-  setgcrefnull(fn->c.tab);
+  setgcref(fn->c.tab, obj2gco(lj_tab_new(L, 0, 0)));
   return fn;
 }
 
