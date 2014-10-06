@@ -574,7 +574,7 @@ E= @echo
 # Make targets.
 ##############################################################################
 
-ifeq (thumb,$(LJ_TARGET_THUMB))
+ifeq (thumb,$(TARGET_LJARCH))
 	TARGET_Z=	$(TARGET_O)
 else
 	TARGET_Z=	$(TARGET_T)
