@@ -1,4 +1,4 @@
-print('1..10')
+print('1..13')
 
 function go ()
 	local f = function () end
@@ -62,3 +62,12 @@ debug.setmetatable(function () end, nil)
 function noise () end
 noise.ok = 5
 print(next(noise, nil), 'next should not freeze, should return first key')
+
+collectgarbage()
+print(rawget(error, 'happy') == nil and 'ok' or 'not ok')
+
+function a () end
+a.ok = 'ok'
+print(rawget(a, 'ok'))
+
+print(next(error, nil) == nil and 'ok' or 'not ok')
