@@ -193,7 +193,6 @@ void dasm_setup(Dst_DECL, const void *actionlist) {
 static uint16_t dasm_immthumb(unsigned int val) {
   // fun encoding time!
   int a = (val & 0x80) >> 7;
-  int _bcdefgh = 0x80 + (val & 0x7F);
   int abcdefgh = (val & 0xFF);
   int ABCDE = 00000;
   int i = 0;
@@ -216,16 +215,22 @@ static uint16_t dasm_immthumb(unsigned int val) {
     // 1bcdefgh 00000000 00000000 00000000
     // ...
     // 00000000 00000000 00000001 bcdefgh0
-    ABCDE = 8;
+    uint32_t truncval = val;
     for (i = 24; i >= 0; i--) {
-      if (val == (_bcdefgh << i)) {
+      if ((truncval & 0x80) && ((truncval & 0xFF) == truncval)) {
+        ABCDE = i + 8;
+        truncval = truncval & 0x7f;
         break;
       }
-      ABCDE = ABCDE + 1;
+      truncval >>= 1;
     }
     if (i == 0) {
       return -1;
     }
+    if ((truncval + 0x80) << (32-ABCDE) != val) {
+      return -1;
+    }
+    val = truncval;
   }
   return (ABCDE << 7) | (val & 0x7F);
 }
