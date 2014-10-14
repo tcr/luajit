@@ -417,7 +417,7 @@ local map_op = {
   ["sub_2"] = "sdi:00111dddiiiiiiii|spi:101100001fffffff",
   ["sub.w_3"] = "sdni:11110H01101snnnn0HHHddddHHHHHHHH|sdnmT:11101011101snnnn0iiiddddiiTTmmmm",
   ["sub.w_4"] = "sdnmT:11101011101snnnn0iiiddddiiTTmmmm",
-  ["subw_3"] = "dni:11110H101010nnnn0HHHddddHHHHHHHH",
+  ["subw_3"] = "dnM:11110M101010nnnn0MMMddddMMMMMMMM",
   ["svc_1"] = "i:11011111iiiiiiii",
   ["sxtb_2"] = "dm:1011001001mmmddd",
   ["sxtb.w_2"] = "dmr:11111010010011111111dddd10rrmmmm",
@@ -837,7 +837,6 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
         -- fun encoding time!
         local val = parse_imm_thumb(imm)
         local a = shr(band(val, 0x80), 7)
-        local _bcdefgh = 0x80 + band(val, 0x7F)
         local abcdefgh = band(val, 0xFF);
         local ABCDE = 00000
 
@@ -858,16 +857,19 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
           -- 1bcdefgh 00000000 00000000 00000000
           -- ...
           -- 00000000 00000000 00000001 bcdefgh0
-          ABCDE = 8;
+          local truncval = bit.tobit(val)
           for i = 24,0,-1 do
-            if val == shl(_bcdefgh, i) then
-              break;
+            if band(truncval, 0x80) and band(truncval, 0xFF) == truncval then
+              ABCDE = i + 8
+              truncval = band(truncval, 0x7f)
+              break
             end
-            ABCDE = ABCDE + 1
+            truncval = shr(truncval, 1)
           end
-          if i == 0 then
-            werror('bad thumb expanded immediate ' + val)
+          if shl(truncval + 0x80, 32-ABCDE) ~= val then
+            werror('bad thumb expanded immediate ' .. tostring(val))
           end
+          val = truncval
         end
 
         values['H'] = shl(ABCDE, 7) + band(val, 0x7F)
