@@ -2928,11 +2928,17 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   add RB, PC, RB, lsl #2
 #if LJ_COLONY
     |  checktp CARG2, LJ_TISNUM
-    |  bne >1
+    |   bhi >5
+    |  checktp CARG2, LJ_TISNUM
+    |   beq >4
+    |  mvn CARG3, CARG2
+    |  cmn CARG3, #2
+    |  b >3
+    |4:
     |  mvn CARG3, CARG1
     |  cmn CARG3, #2
     |  b >3
-    |1:
+    |5:
     |  checkstr CARG2, >2
     |  ldr CARG3, STR:CARG1->len
     |  mvn CARG3, CARG3
@@ -2980,23 +2986,29 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   ins_next2
 #if LJ_COLONY
     |  checktp CARG1, LJ_TISNUM
-    |  bne >1
+    |   bhi >2
+    |  checktp CARG1, LJ_TISNUM
+    |   beq >1
+    |  mvn CARG1, CARG1
+    |  cmn CARG1, #2
+    |   b >4
+    |1:
     |  ldr CARG1, [RC]
     |  mvn CARG1, CARG1
     |  cmn CARG1, #2
-    |  b >3
-    |1:
-    |  checkstr CARG1, >2
+    |  b >4
+    |2:
+    |  checkstr CARG1, >3
     | // TODO these can be flattened:
     |  ldr CARG1, [RC]
     |  ldr CARG1, STR:CARG1->len
     |  mvn CARG1, CARG1
     |  cmn CARG1, #2
-    |  b >3
+    |  b >4
 #endif
-    |2:
-    |  checktp CARG1, LJ_TTRUE
     |3:
+    |  checktp CARG1, LJ_TTRUE
+    |4:
     |  mvnls CARG2, #~LJ_TFALSE
     |  mvnhi CARG2, #~LJ_TTRUE
     |  str CARG2, [RA, #4]
