@@ -50,17 +50,10 @@ void lj_dispatch_init(GG_State *GG)
 {
   uint32_t i;
   ASMFunction *disp = GG->dispatch;
-#if LJ_TARGET_THUMB
-  for (i = 0; i < GG_LEN_SDISP; i++)
-    disp[GG_LEN_DDISP+i] = disp[i] = makeasmfunc(lj_bc_ofs[i]);
-  for (i = GG_LEN_SDISP; i < GG_LEN_DDISP; i++)
-    disp[i] = makeasmfunc(lj_bc_ofs[i])+1;
-#else
   for (i = 0; i < GG_LEN_SDISP; i++)
     disp[GG_LEN_DDISP+i] = disp[i] = makeasmfunc(lj_bc_ofs[i]);
   for (i = GG_LEN_SDISP; i < GG_LEN_DDISP; i++)
     disp[i] = makeasmfunc(lj_bc_ofs[i]);
-#endif
   /* The JIT engine is off by default. luaopen_jit() turns it on. */
   disp[BC_FORL] = disp[BC_IFORL];
   disp[BC_ITERL] = disp[BC_IITERL];
@@ -327,7 +320,7 @@ LUA_API int lua_sethook(lua_State *L, lua_Hook func, int mask, int count)
   g->hookcount = g->hookcstart = (int32_t)count;
   g->hookmask = (uint8_t)((g->hookmask & ~HOOK_EVENTMASK) | mask);
   lj_trace_abort(g);  /* Abort recording on any hook change. */
-  lj_dispatch_update(g);
+  // lj_dispatch_update(g);
   return 1;
 }
 
