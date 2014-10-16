@@ -111,6 +111,10 @@ enum { LJ_CONT_TAILCALL, LJ_CONT_FFI_CALLBACK };  /* Special continuations. */
 LJ_ASMF char lj_vm_asm_begin[];
 
 /* Bytecode offsets are relative to lj_vm_asm_begin. */
+#if LJ_TARGET_THUMB
+#define makeasmfunc(ofs)	(((ASMFunction)(lj_vm_asm_begin + (ofs)))+1)
+#else
 #define makeasmfunc(ofs)	((ASMFunction)(lj_vm_asm_begin + (ofs)))
+#endif
 
 #endif
