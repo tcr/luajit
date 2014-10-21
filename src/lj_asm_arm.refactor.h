@@ -33,6 +33,7 @@ struct { } ARMY;
 // CC
 #define ARMY_CC_IS(A) ((_W(A))>>28)
 #define ARMY_CC_REPLACE(A, B, C) A ^= ((B^C) << 28)
+#define ARMY_CCB(A, B) ARMF_CC(A, B)
 // #define ARMY_OR(A, B) (_W(A)|_W(B))
 // #define ARMY_OR_ASSIGN(A, B) A|=_W(B)
 
@@ -222,7 +223,7 @@ static MCode *asm_exitstub_gen(ASMState *as, ExitNo group)
   if (mxp + 4*4+4*EXITSTUBS_PER_GROUP >= as->mctop)
     asm_mclimit(as);
   /* str lr, [sp]; bl ->vm_exit_handler; .long DISPATCH_address, group. */
-  *mxp++ = ARMY_D_N(ARMY_FLAG(ARMY_FLAG(ARMI_STR, ARMI_LS_P), ARMI_LS_U), ARMF_D(RID_LR), ARMF_N(RID_SP));
+  *mxp++ = ARMY_D_N(ARMY_FLAG(ARMI_STR, ARMI_LS_P | ARMI_LS_U), ARMF_D(RID_LR), ARMF_N(RID_SP));
   *mxp = ARMY_B(ARMI_BL, ((MCode *)(void *)lj_vm_exit_handler-mxp)-2);
   mxp++;
   *mxp++ = (MCode)i32ptr(J2GG(as->J)->dispatch);  /* DISPATCH address */
@@ -255,10 +256,10 @@ static void asm_guardcc(ASMState *as, ARMCC cc)
   if (LJ_UNLIKELY(p == as->invmcp)) {
     as->loopinv = 1;
     *p = ARMY_B(ARMI_BL, target-p-2);
-    emit_branch(as, ARMF_CC(ARMI_B, cc^1), p+1);
+    emit_branch(as, ARMY_CCB(ARMI_B, cc^1), p+1);
     return;
   }
-  emit_branch(as, ARMF_CC(ARMI_BL, cc), target);
+  emit_branch(as, ARMY_CCB(ARMI_BL, cc), target);
 }
 
 /* -- Operand fusion ------------------------------------------------------ */
@@ -403,7 +404,7 @@ static void asm_fusexref(ASMState *as, ARMIns ai, Reg rd, IRRef ref,
 	rn = ra_alloc1(as, lref, allow);
 	rm = ra_alloc1(as, rref, rset_exclude(allow, rn));
 	if (ARMY_HWORD(ai)) ai = ARMY_FLAG(ai, ARMI_LS_R);
-	emit_dnm(as, ARMY_FLAG(ARMY_FLAG(ai, ARMI_LS_P), ARMI_LS_U), rd, rn, rm);
+	emit_dnm(as, ARMY_FLAG(ai, ARMI_LS_P | ARMI_LS_U), rd, rn, rm);
 	return;
       }
     } else if (ir->o == IR_STRREF && !(!LJ_SOFTFP && ARMY_ISVFP(ai))) {
@@ -430,7 +431,7 @@ static void asm_fusexref(ASMState *as, ARMIns ai, Reg rd, IRRef ref,
 	Reg rn = ra_alloc1(as, ref, allow);
 	Reg rm = ra_allock(as, ofs, rset_exclude(allow, rn));
 	if (ARMY_HWORD(ai)) ai = ARMY_FLAG(ai, ARMI_LS_R);
-	emit_dnm(as, ARMY_FLAG(ARMY_FLAG(ai, ARMI_LS_P), ARMI_LS_U), rd, rn, rm);
+	emit_dnm(as, ARMY_FLAG(ai, ARMI_LS_P | ARMI_LS_U), rd, rn, rm);
 	return;
       }
     }
@@ -990,16 +991,16 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
   if (merge == IR_EQ)
     asm_guardcc(as, CC_EQ);
   else
-    emit_branch(as, ARMF_CC(ARMI_B, CC_EQ), l_end);
+    emit_branch(as, ARMY_CCB(ARMI_B, CC_EQ), l_end);
   if (!irt_ispri(kt)) {
-    emit_nm(as, ARMF_CC(ARMI_CMP, CC_EQ)^k, tmp, key);
+    emit_nm(as, ARMY_OP_BODY(ARMF_CC(ARMI_CMP, CC_EQ), k), tmp, key);
     emit_nm(as, ARMY_OP_BODY(ARMI_CMP, khi), tmp+1, keyhi);
     emit_lsox(as, ARMI_LDRD, tmp, dest, (int32_t)offsetof(Node, key));
   } else {
     emit_n(as, ARMY_OP_BODY(ARMI_CMP, khi), tmp);
     emit_lso(as, ARMI_LDR, tmp, dest, (int32_t)offsetof(Node, key.it));
   }
-  *l_loop = ARMY_B(ARMF_CC(ARMI_B, CC_NE), as->mcp-l_loop-2);
+  *l_loop = ARMY_B(ARMY_CCB(ARMI_B, CC_NE), as->mcp-l_loop-2);
 
   /* Load main position relative to tab->node into dest. */
   khash = irref_isk(refkey) ? ir_khash(irkey) : 1;
@@ -1022,7 +1023,7 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
       if (ra_hasreg(keynumhi)) {  /* Canonicalize +-0.0 to 0.0. */
 	if (keyhi == RID_TMP)
 	  emit_dm(as, ARMF_CC(ARMI_MOV, CC_NE), keyhi, keynumhi);
-	emit_d(as, ARMF_CC(ARMI_MOV, CC_EQ)|ARMI_K12|0, keyhi);
+	emit_d(as, ARMY_K12(ARMF_CC(ARMI_MOV, CC_EQ), 0), keyhi);
       }
       emit_dnm(as, ARMI_AND, tmp, tmp, RID_TMP);
       emit_dnm(as, ARMY_SH(ARMI_SUB, ARMSH_ROR, 32-HASH_ROT3), tmp, tmp, tmp+1);
@@ -1480,7 +1481,7 @@ static void asm_tbar(ASMState *as, IRIns *ir)
   emit_dn(as, ARMY_K12(ARMI_BIC, LJ_GC_BLACK), mark, mark);
   emit_lso(as, ARMI_LDR, link, gr,
 	   (int32_t)offsetof(global_State, gc.grayagain));
-  emit_branch(as, ARMF_CC(ARMI_B, CC_EQ), l_end);
+  emit_branch(as, ARMY_CCB(ARMI_B, CC_EQ), l_end);
   emit_n(as, ARMY_K12(ARMI_TST, LJ_GC_BLACK), mark);
   emit_lso(as, ARMI_LDRB, mark, tab, (int32_t)offsetof(GCtab, marked));
 }
@@ -1501,11 +1502,11 @@ static void asm_obar(ASMState *as, IRIns *ir)
   if (ARMY_CC_IS(l_end[-1])==CC_AL)
     l_end[-1] = ARMF_CC(l_end[-1], CC_NE);
   else
-    emit_branch(as, ARMF_CC(ARMI_B, CC_EQ), l_end);
+    emit_branch(as, ARMY_CCB(ARMI_B, CC_EQ), l_end);
   ra_allockreg(as, i32ptr(J2G(as->J)), ra_releasetmp(as, ASMREF_TMP1));
   obj = IR(ir->op1)->r;
   tmp = ra_scratch(as, rset_exclude(RSET_GPR, obj));
-  emit_n(as, ARMF_CC(ARMI_TST, CC_NE)|ARMI_K12|LJ_GC_BLACK, tmp);
+  emit_n(as, ARMY_K12(ARMF_CC(ARMI_TST, CC_NE), LJ_GC_BLACK), tmp);
   emit_n(as, ARMY_K12(ARMI_TST, LJ_GC_WHITES), RID_TMP);
   val = ra_alloc1(as, ir->op2, rset_exclude(RSET_GPR, obj));
   emit_lso(as, ARMI_LDRB, tmp, obj,
@@ -1783,7 +1784,7 @@ static void asm_intmin_max(ASMState *as, IRIns *ir, int cc)
     right = ra_alloc1(as, ir->op2, rset_exclude(RSET_GPR, left));
   }
   if (kmov || dest != right) {
-    emit_dm(as, ARMF_CC(ARMI_MOV, cc)^kmov, dest, right);
+    emit_dm(as, ARMY_OP_BODY(ARMF_CC(ARMI_MOV, cc), kmov), dest, right);
     cc ^= 1;  /* Must use opposite conditions for paired moves. */
   } else {
     cc ^= (CC_LT^CC_GT);  /* Otherwise may swap CC_LT <-> CC_GT. */
@@ -1983,12 +1984,12 @@ static void asm_int64comp(ASMState *as, IRIns *ir)
     MCLabel l_around = emit_label(as);
     asm_guardcc(as, cclo);
     emit_n(as, ARMY_OP_BODY(ARMI_CMP, mlo), leftlo);
-    emit_branch(as, ARMF_CC(ARMI_B, CC_NE), l_around);
+    emit_branch(as, ARMY_CCB(ARMI_B, CC_NE), l_around);
     if (cchi == CC_GE || cchi == CC_LE) cchi ^= 6;  /* GE -> GT, LE -> LT */
     asm_guardcc(as, cchi);
   } else {
     asm_guardcc(as, cclo);
-    emit_n(as, ARMY_OP_BODYARMF_CC(ARMI_CMP, CC_EQ), mlo), leftlo);
+    emit_n(as, ARMY_OP_BODY(ARMF_CC(ARMI_CMP, CC_EQ), mlo), leftlo);
   }
   emit_n(as, ARMY_OP_BODY(ARMI_CMP, mhi), lefthi);
 }
@@ -2099,7 +2100,7 @@ static void asm_stack_check(ASMState *as, BCReg topslot,
   } else {
     pbase = RID_BASE;
   }
-  emit_branch(as, ARMF_CC(ARMI_BL, CC_LS), exitstub_addr(as->J, exitno));
+  emit_branch(as, ARMY_CCB(ARMI_BL, CC_LS), exitstub_addr(as->J, exitno));
   k = emit_isk12(0, (int32_t)(8*topslot));
   lua_assert(k);
   emit_n(as, ARMY_OP_BODY(ARMI_CMP, k), RID_TMP);
@@ -2196,7 +2197,7 @@ static void asm_gc_check(ASMState *as)
   tmp2 = ra_releasetmp(as, ASMREF_TMP2);
   emit_loadi(as, tmp2, as->gcsteps);
   /* Jump around GC step if GC total < GC threshold. */
-  emit_branch(as, ARMF_CC(ARMI_B, CC_LS), l_end);
+  emit_branch(as, ARMY_CCB(ARMI_B, CC_LS), l_end);
   emit_nm(as, ARMI_CMP, RID_TMP, tmp2);
   emit_lso(as, ARMI_LDR, tmp2, tmp1,
 	   (int32_t)offsetof(global_State, gc.threshold));
