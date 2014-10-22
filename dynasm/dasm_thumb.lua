@@ -321,7 +321,7 @@ local map_op = {
   ["ldr.w_3"] = "tL:111110000101nnnntttt1PUWiiiiiiii",
   ["ldrb_2"] = "tL:01111iiiiinnnttt|tL:0101110mmmnnnttt",
   ["ldrb.w_3"] = "tL:111110000001nnnntttt1PUWiiiiiiii|tL:111110000001nnnntttt000000iimmmm",
-  ["ldrb.w_2"] = "tL:111110000001nnnntttt1PUWiiiiiiii|tL:111110000001nnnntttt000000iimmmm|tL:111110001001nnnnttttiiiiiiiiiiii|tB:11111000u0011111ttttiiiiiiiiiiii",
+  ["ldrb.w_2"] = "tL:111110001001nnnnttttiiiiiiiiiiii|tL:111110000001nnnntttt1PUWiiiiiiii|tL:111110000001nnnntttt000000iimmmm|tB:11111000u0011111ttttiiiiiiiiiiii",
   ["ldrbt_2"] = "tL:111110000001nnnntttt1110iiiiiiii",
   ["ldrex_2"] = "tL:111010000101nnnntttt1111ffffffff",
   ["ldrexb_2"] = "tL:111010001101nnnntttt111101001111",
@@ -409,7 +409,8 @@ local map_op = {
   ["strd_3"] = "tdL:1110100PU1W0nnnnttttddddffffffff",
   ["strd_4"] = "tdL:1110100PU1W0nnnnttttddddffffffff",
   ["strh_3"] = "tL:10000iiiiinnnttt|tL:0101001mmmnnnttt",
-  ["strh.w_3"] = "tL:111110001010nnnnttttiiiiiiiiiiii|tL:111110000010nnnntttt1PUWiiiiiiii",
+  ["strh.w_2"] = "tL:111110001010nnnnttttiiiiiiiiiiii|tL:111110000010nnnntttt1PUWiiiiiiii|tL:111110000010nnnntttt000000iimmmm",
+  ["strh.w_3"] = "tL:111110000010nnnntttt1PUWiiiiiiii",
   ["strht_3"] = "tL:111110000010nnnntttt1110iiiiiiii",
   ["strt_3"] = "tL:111110000100nnnntttt1110iiiiiiii",
   ["sub_3"] = "sdni:0001111iiinnnddd|sdnm:0001101mmmnnnddd",
@@ -664,7 +665,7 @@ local function parse_imm(imm, bits, shift, scale, puw, instrlen)
     if scale > 3 then werror('IMM scale too big: ' .. scale) end
 
     -- TODO why this
-    if imm ~= 'GG_DISP2STATIC' then
+    if imm ~= 'GG_DISP2STATIC' and (match(imm, 'DISPATCH_J') == nil or bits < 8) then
       if not puw or puw == 0 then werror('IMM must be signed') end
     end
     waction("IMM", shl(puw == 7 and 2 or (puw == 9 and 1 or 0), 10) + shl(bits, 5) + shl(shift, 1) + (scale == 2 and 1 or 0), imm)
