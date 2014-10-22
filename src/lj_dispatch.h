@@ -73,11 +73,16 @@ typedef struct GG_State {
 #if LJ_TARGET_MIPS
   ASMFunction got[LJ_GOT__MAX];		/* Global offset table. */
 #endif
+#if LJ_TARGET_THUMB
+  ASMFunction dispatch[GG_LEN_DISP];  /* Instruction dispatch tables. */
+#endif
 #if LJ_HASJIT
   jit_State J;				/* JIT state. */
   HotCount hotcount[HOTCOUNT_SIZE];	/* Hot counters. */
 #endif
-  ASMFunction dispatch[GG_LEN_DISP];	/* Instruction dispatch tables. */
+#if !LJ_TARGET_THUMB
+  ASMFunction dispatch[GG_LEN_DISP];  /* Instruction dispatch tables. */
+#endif
   BCIns bcff[GG_NUM_ASMFF];		/* Bytecode for ASM fast functions. */
 } GG_State;
 
