@@ -99,7 +99,7 @@ static void emit_m(ASMState *as, ARMIns ai, Reg rm)
 static void emit_lsox(ASMState *as, ARMIns ai, Reg rd, Reg rn, int32_t ofs)
 {
   lua_assert(ofs >= -255 && ofs <= 255);
-  if (ofs < 0) ofs = -ofs; else ai |= ARMI_LS_U;
+  if (ofs < 0) ofs = -ofs; else ai = ARMY_FLAG(ai, ARMI_LS_U);
   *--as->mcp = ARMY_OFS(ARMY_DN(ARMY_FLAG(ai, ARMI_LS_P | ARMI_LSX_I), rd, rn),
 	       ((ofs & 0xf0) << 4) | (ofs & 0x0f));
 }
@@ -124,7 +124,7 @@ static void emit_lso(ASMState *as, ARMIns ai, Reg rd, Reg rn, int32_t ofs)
 static void emit_vlso(ASMState *as, ARMIns ai, Reg rd, Reg rn, int32_t ofs)
 {
   lua_assert(ofs >= -1020 && ofs <= 1020 && (ofs&3) == 0);
-  if (ofs < 0) ofs = -ofs; else ai |= ARMI_LS_U;
+  if (ofs < 0) ofs = -ofs; else ai = ARMY_FLAG(ai, ARMI_LS_U);
   *--as->mcp = ARMY_OFS(ARMY_DN(ARMY_FLAG(ai, ARMI_LS_P), rd & 15, rn), ofs >> 2);
 }
 #endif

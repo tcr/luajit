@@ -2049,6 +2049,7 @@ static void asm_hiop(ASMState *as, IRIns *ir)
     break;
   case IR_NEG:
     as->curins--;
+    // TODO fix this on thumb
     asm_intneg(as, ir, ARMI_RSC);
     asm_intneg(as, ir-1, ARMY_COND(ARMI_RSB));
     break;
