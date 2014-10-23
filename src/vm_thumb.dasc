@@ -2157,7 +2157,7 @@ static void build_subroutines(BuildCtx *ctx)
   |->vm_hotloop:			// Hot loop counter underflow.
   |.if JIT
   |  ldr LFUNC:CARG3, [BASE, FRAME_FUNC]  // Same as curr_topL(L).
-  |   sub CARG1, DISPATCH, #-GG_DISP2J
+  |   add CARG1, DISPATCH, #GG_DISP2J
   |   str PC, SAVE_PC
   |  ldr CARG3, LFUNC:CARG3->field_pc
   |   mov CARG2, PC
@@ -2231,7 +2231,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  str L, [DISPATCH, #DISPATCH_J(L)]
   |    str BASE, L->base
   |   str CARG4, [DISPATCH, #DISPATCH_GL(jit_L)]
-  |  sub CARG1, DISPATCH, #-GG_DISP2J
+  |  add CARG1, DISPATCH, #GG_DISP2J
   |  mov CARG2, sp
   |  bl extern lj_trace_exit		// (jit_State *J, ExitState *ex)
   |  // Returns MULTRES (unscaled) or negated error code.
@@ -4408,6 +4408,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ldr TRACE:RC, [CARG1, RC, lsl #2]
     |   st_vmstate CARG2
     |  ldr RA, TRACE:RC->mcode
+    |  add RA, RA, #1
     |   str BASE, [DISPATCH, #DISPATCH_GL(jit_base)]
     |   str L, [DISPATCH, #DISPATCH_GL(jit_L)]
     |  bx RA

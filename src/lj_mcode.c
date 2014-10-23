@@ -210,7 +210,7 @@ static void mcode_protect(jit_State *J, int prot)
 #define mcode_validptr(p)	((p) && (uintptr_t)(p) < 0xffff0000)
 #endif
 
-#ifdef LJ_TARGET_JUMPRANGE
+#if 0
 
 /* Get memory within relative jump distance of our code in 64 bit mode. */
 static void *mcode_alloc(jit_State *J, size_t sz)
