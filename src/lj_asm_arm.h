@@ -5,142 +5,28 @@
 
 /* -- Register allocator extensions --------------------------------------- */
 
-struct { } ARMY;
-
-// #define _W(A) ((int)&A)
-#define _W(A) A
-
 #define ARMY_IT(cc) *--as->mcp = 0xbf08bf00u | (((cc)&0xf) << 20)
 
-#define ARMY_SH(A, B, S) (_W(A)|_W(ARMF_SH(B, S)))
-#define ARMY_RSH(A, B, S) (_W(A)|_W(ARMF_RSH(B, S)))
-#define ARMY_COND(A) (_W(A)|_W(ARMI_S))
-#define ARMY_MULL(A, B) (_W(A)|_W(ARMF_S(B)))
-#define ARMY_IS(A, B) ((_W(A) & ~ARMI_S) == _W(B))
+#define ARMY_SH(A, B, S) ((A)|(ARMF_SH(B, S)))
+#define ARMY_RSH(A, B, S) ((A)|(ARMF_RSH(B, S)))
+#define ARMY_COND(A) ((A)|(ARMI_S))
+#define ARMY_MULL(A, B) ((A)|(ARMF_S(B)))
+#define ARMY_IS(A, B) (((A) & ~ARMI_S) == (B))
 // reverse operand order
-#define ARMY_REVERSE(A) A ^= _W(ARMI_SUB)^_W(ARMI_RSB)
+#define ARMY_REVERSE(A) A ^= (ARMI_SUB)^(ARMI_RSB)
 // see if BODY has changed its op
-#define ARMY_MOD_OP(A) (A & (_W(ARMI_AND)^_W(ARMI_BIC)))
+#define ARMY_MOD_OP(A) (A & ((ARMI_AND)^(ARMI_BIC)))
 // P U W and I flags
-#define ARMY_FLAG(A, B) (_W(A)|_W(B))
+#define ARMY_FLAG(A, B) ((A)|(B))
 // rd rn regs
-#define ARMY_D_N(A, B, C) (_W(A)|_W(B)|_W(C))
+#define ARMY_D_N(A, B, C) ((A)|(B)|(C))
 // ldr/str checks
-#define ARMY_ISVFP(A) (_W(A)&0x08000000)
-#define ARMY_HWORD(A) (_W(A)&0x04000000)
+#define ARMY_ISVFP(A) ((A)&0x08000000)
+#define ARMY_HWORD(A) ((A)&0x04000000)
 // CC
-#define ARMY_CC_IS(A) ((_W(A))>>28)
+#define ARMY_CC_IS(A) (((A))>>28)
 #define ARMY_CC_REPLACE(A, B, C) A ^= ((B^C) << 28)
 #define ARMY_CCB(A, B) (A)
-// #define ARMY_OR(A, B) (_W(A)|_W(B))
-// #define ARMY_OR_ASSIGN(A, B) A|=_W(B)
-
-// #define ARMI_CCAL ARMY
-// #define ARMI_S ARMY
-// #define ARMI_K12 ARMY
-// #define ARMI_KNEG ARMY
-// #define ARMI_LS_W ARMY
-// #define ARMI_LS_U ARMY
-// #define ARMI_LS_P ARMY
-// #define ARMI_LS_R ARMY
-// #define ARMI_LSX_I ARMY
-
-// #define ARMI_AND ARMY
-// #define ARMI_EOR ARMY
-// #define ARMI_SUB ARMY
-// #define ARMI_RSB ARMY
-// #define ARMI_ADD ARMY
-// #define ARMI_ADC ARMY
-// #define ARMI_SBC ARMY
-// #define ARMI_RSC ARMY
-// #define ARMI_TST ARMY
-// #define ARMI_TEQ ARMY
-// #define ARMI_CMP ARMY
-// #define ARMI_CMN ARMY
-// #define ARMI_ORR ARMY
-// #define ARMI_MOV ARMY
-// #define ARMI_BIC ARMY
-// #define ARMI_MVN ARMY
-
-// #define ARMI_NOP ARMY
-
-// #define ARMI_MUL ARMY
-// #define ARMI_SMULL ARMY
-
-// #define ARMI_LDR ARMY
-// #define ARMI_LDRB ARMY
-// #define ARMI_LDRH ARMY
-// #define ARMI_LDRSB ARMY
-// #define ARMI_LDRSH ARMY
-// #define ARMI_LDRD ARMY
-// #define ARMI_STR ARMY
-// #define ARMI_STRB ARMY
-// #define ARMI_STRH ARMY
-// #define ARMI_STRD ARMY
-// #define ARMI_PUSH ARMY
-
-// #define ARMI_B ARMY
-// #define ARMI_BL ARMY
-// #define ARMI_BLX ARMY
-// #define ARMI_BLXr ARMY
-
-// #define /* ARMv6 */
-// #define ARMI_REV ARMY
-// #define ARMI_SXTB ARMY
-// #define ARMI_SXTH ARMY
-// #define ARMI_UXTB ARMY
-// #define ARMI_UXTH ARMY
-
-// #define  ARMv6T2 
-// #define ARMI_MOVW ARMY
-// #define ARMI_MOVT ARMY
-
-// #define /* VFP */
-// #define ARMI_VMOV_D ARMY
-// #define ARMI_VMOV_S ARMY
-// #define ARMI_VMOVI_D ARMY
-
-// #define ARMI_VMOV_R_S ARMY
-// #define ARMI_VMOV_S_R ARMY
-// #define ARMI_VMOV_RR_D ARMY
-// #define ARMI_VMOV_D_RR ARMY
-
-// #define ARMI_VADD_D ARMY
-// #define ARMI_VSUB_D ARMY
-// #define ARMI_VMUL_D ARMY
-// #define ARMI_VMLA_D ARMY
-// #define ARMI_VMLS_D ARMY
-// #define ARMI_VNMLS_D ARMY
-// #define ARMI_VDIV_D ARMY
-
-// #define ARMI_VABS_D ARMY
-// #define ARMI_VNEG_D ARMY
-// #define ARMI_VSQRT_D ARMY
-
-// #define ARMI_VCMP_D ARMY
-// #define ARMI_VCMPZ_D ARMY
-
-// #define ARMI_VMRS ARMY
-
-// #define ARMI_VCVT_S32_F32 ARMY
-// #define ARMI_VCVT_S32_F64 ARMY
-// #define ARMI_VCVT_U32_F32 ARMY
-// #define ARMI_VCVT_U32_F64 ARMY
-// #define ARMI_VCVTR_S32_F32 ARMY
-// #define ARMI_VCVTR_S32_F64 ARMY
-// #define ARMI_VCVTR_U32_F32 ARMY
-// #define ARMI_VCVTR_U32_F64 ARMY
-// #define ARMI_VCVT_F32_S32 ARMY
-// #define ARMI_VCVT_F64_S32 ARMY
-// #define ARMI_VCVT_F32_U32 ARMY
-// #define ARMI_VCVT_F64_U32 ARMY
-// #define ARMI_VCVT_F32_F64 ARMY
-// #define ARMI_VCVT_F64_F32 ARMY
-
-// #define ARMI_VLDR_S ARMY
-// #define ARMI_VLDR_D ARMY
-// #define ARMI_VSTR_S ARMY
-// #define ARMI_VSTR_D ARMY
 
 /* Allocate a register with a hint. */
 static Reg ra_hintalloc(ASMState *as, IRRef ref, Reg hint, RegSet allow)

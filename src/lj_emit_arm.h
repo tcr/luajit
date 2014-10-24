@@ -3,11 +3,9 @@
 ** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
 */
 
-#define _W(A) A
-
 // P U W and I flags
-#define ARMY_FLAG(A, B) (_W(A)|_W(B))
-#define ARMY_OFS(A, B) (_W(A)|(_W(B)<<16))
+#define ARMY_FLAG(A, B) ((A)|(B))
+#define ARMY_OFS(A, B) ((A)|((B)<<16))
 
 #define ARMY_DNM(ai, rd, rn, rm) ((ai) | ARMF_D(rd) | ARMF_N(rn) | ARMF_M(rm))
 #define ARMY_DN(ai, rd, rn) ((ai) | ARMF_D(rd) | ARMF_N(rn))
