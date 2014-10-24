@@ -136,7 +136,7 @@ typedef uint32_t RegCost;
 
 #if LJ_TARGET_X86ORX64
 #include "lj_target_x86.h"
-#elif LJ_TARGET_ARM
+#elif LJ_TARGET_ARM || LJ_TARGET_THUMB
 #include "lj_target_arm.h"
 #elif LJ_TARGET_PPC
 #include "lj_target_ppc.h"

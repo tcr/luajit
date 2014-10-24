@@ -3,6 +3,20 @@
 ** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
 */
 
+// P U W and I flags
+#define ARMY_FLAG(A, B) ((A)|(B))
+#define ARMY_OFS(A, B) ((A)|((B)<<16))
+
+#define ARMY_DNM(ai, rd, rn, rm) ((ai) | ARMF_D(rd) | ARMF_N(rn) | ARMF_M(rm))
+#define ARMY_DN(ai, rd, rn) ((ai) | ARMF_D(rd) | ARMF_N(rn))
+#define ARMY_TN(ai, rd, rn) ((ai) | ARMF_T(rd) | ARMF_N(rn))
+#define ARMY_DM(ai, rd, rm) ((ai) | ARMF_D(rd) | ARMF_M(rm))
+#define ARMY_DM2(ai, rd, rm) ((ai) | ARMF_D(rd) | ARMF_M2(rm))
+#define ARMY_NM(ai, rn, rm) ((ai) | ARMF_N(rn) | ARMF_M(rm))
+#define ARMY_D(ai, rd) ((ai) | ARMF_D(rd))
+#define ARMY_N(ai, rn) ((ai) | ARMF_N(rn))
+#define ARMY_M(ai, rm) ((ai) | ARMF_M(rm))
+
 /* -- Constant encoding --------------------------------------------------- */
 
 static uint8_t emit_invai[16] = {
@@ -28,17 +42,23 @@ static uint8_t emit_invai[16] = {
 static uint32_t emit_isk12(ARMIns ai, int32_t n)
 {
   uint32_t invai, i, m = (uint32_t)n;
-  /* K12: unsigned 8 bit value, rotated in steps of two bits. */
-  for (i = 0; i < 4096; i += 256, m = lj_rol(m, 2))
-    if (m <= 255) return ARMI_K12|m|i;
+  /* K12: unsigned 8 bit value, rotated in steps of one bit. */
+  for (i = 0; i < 4096; i += 128, m = lj_rol(m, 1))
+    if (m <= 255) {
+      if (m & 0x80 && i > 128*8) return ARMY_K12(0, i|(m & 0x7f));
+      else if (i < 128*8) return ARMY_K12(0, m & 0xff);
+    }
   /* Otherwise try negation/complement with the inverse instruction. */
   invai = emit_invai[((ai >> 21) & 15)];
   if (!invai) return 0;  /* Failed. No inverse instruction. */
   m = ~(uint32_t)n;
   if (invai == ((ARMI_SUB^ARMI_ADD) >> 21) ||
       invai == (ARMI_CMP^ARMI_CMN) >> 21) m++;
-  for (i = 0; i < 4096; i += 256, m = lj_rol(m, 2))
-    if (m <= 255) return ARMI_K12|(invai<<21)|m|i;
+  for (i = 0; i < 4096; i += 128, m = lj_rol(m, 1))
+    if (m <= 255) {
+      if (m & 0x80 && i > 128*8) return ARMY_K12(invai<<21, i|(m & 0x7f));
+      else if (i < 128*8) return ARMY_K12(invai<<21, m & 0xff);
+    }
   return 0;  /* Failed. */
 }
 
@@ -46,52 +66,57 @@ static uint32_t emit_isk12(ARMIns ai, int32_t n)
 
 static void emit_dnm(ASMState *as, ARMIns ai, Reg rd, Reg rn, Reg rm)
 {
-  *--as->mcp = ai | ARMF_D(rd) | ARMF_N(rn) | ARMF_M(rm);
+  *--as->mcp = ARMY_DNM(ai, rd, rn, rm);
+}
+
+static void emit_dm2(ASMState *as, ARMIns ai, Reg rd, Reg rm)
+{
+  *--as->mcp = ARMY_DM2(ai, rd, rm);
 }
 
 static void emit_dm(ASMState *as, ARMIns ai, Reg rd, Reg rm)
 {
-  *--as->mcp = ai | ARMF_D(rd) | ARMF_M(rm);
+  *--as->mcp = ARMY_DM(ai, rd, rm);
 }
 
 static void emit_dn(ASMState *as, ARMIns ai, Reg rd, Reg rn)
 {
-  *--as->mcp = ai | ARMF_D(rd) | ARMF_N(rn);
+  *--as->mcp = ARMY_DN(ai, rd, rn);
 }
 
 static void emit_nm(ASMState *as, ARMIns ai, Reg rn, Reg rm)
 {
-  *--as->mcp = ai | ARMF_N(rn) | ARMF_M(rm);
+  *--as->mcp = ARMY_NM(ai, rn, rm);
 }
 
 static void emit_d(ASMState *as, ARMIns ai, Reg rd)
 {
-  *--as->mcp = ai | ARMF_D(rd);
+  *--as->mcp = ARMY_D(ai, rd);
 }
 
 static void emit_n(ASMState *as, ARMIns ai, Reg rn)
 {
-  *--as->mcp = ai | ARMF_N(rn);
+  *--as->mcp = ARMY_N(ai, rn);
 }
 
 static void emit_m(ASMState *as, ARMIns ai, Reg rm)
 {
-  *--as->mcp = ai | ARMF_M(rm);
+  *--as->mcp = ARMY_M(ai, rm);
 }
 
 static void emit_lsox(ASMState *as, ARMIns ai, Reg rd, Reg rn, int32_t ofs)
 {
   lua_assert(ofs >= -255 && ofs <= 255);
   if (ofs < 0) ofs = -ofs; else ai |= ARMI_LS_U;
-  *--as->mcp = ai | ARMI_LS_P | ARMI_LSX_I | ARMF_D(rd) | ARMF_N(rn) |
-	       ((ofs & 0xf0) << 4) | (ofs & 0x0f);
+  *--as->mcp = ARMY_OFS(ARMY_DN(ARMY_FLAG(ai, ARMI_LS_P | ARMI_LSX_I), rd, rn),
+	       ((ofs & 0xf0) << 4) | (ofs & 0x0f));
 }
 
 static void emit_lso(ASMState *as, ARMIns ai, Reg rd, Reg rn, int32_t ofs)
 {
   lua_assert(ofs >= -4095 && ofs <= 4095);
   /* Combine LDR/STR pairs to LDRD/STRD. */
-  if (*as->mcp == (ai|ARMI_LS_P|ARMI_LS_U|ARMF_D(rd^1)|ARMF_N(rn)|(ofs^4)) &&
+  if (*as->mcp == ARMY_OFS(ARMY_DN(ARMY_FLAG(ai, ARMI_LS_P|ARMI_LS_U), rd^1, rn),ofs^4) &&
       (ai & ~(ARMI_LDR^ARMI_STR)) == ARMI_STR && rd != rn &&
       (uint32_t)ofs <= 252 && !(ofs & 3) && !((rd ^ (ofs >>2)) & 1) &&
       as->mcp != as->mcloop) {
@@ -99,8 +124,8 @@ static void emit_lso(ASMState *as, ARMIns ai, Reg rd, Reg rn, int32_t ofs)
     emit_lsox(as, ai == ARMI_LDR ? ARMI_LDRD : ARMI_STRD, rd&~1, rn, ofs&~4);
     return;
   }
-  if (ofs < 0) ofs = -ofs; else ai |= ARMI_LS_U;
-  *--as->mcp = ai | ARMI_LS_P | ARMF_D(rd) | ARMF_N(rn) | ofs;
+  if (ofs < 0) ofs = -ofs; else ai = ARMY_FLAG(ai, ARMI_LS_U);
+  *--as->mcp = ARMY_OFS(ARMY_TN(ARMY_FLAG(ai, ARMI_LS_P), rd, rn), ofs);
 }
 
 #if !LJ_SOFTFP
@@ -108,7 +133,7 @@ static void emit_vlso(ASMState *as, ARMIns ai, Reg rd, Reg rn, int32_t ofs)
 {
   lua_assert(ofs >= -1020 && ofs <= 1020 && (ofs&3) == 0);
   if (ofs < 0) ofs = -ofs; else ai |= ARMI_LS_U;
-  *--as->mcp = ai | ARMI_LS_P | ARMF_D(rd & 15) | ARMF_N(rn) | (ofs >> 2);
+  *--as->mcp = ARMY_OFS(ARMY_DN(ARMY_FLAG(ai, ARMI_LS_P), rd & 15, rn), ofs >> 2);
 }
 #endif
 
@@ -132,7 +157,7 @@ static int emit_kdelta1(ASMState *as, Reg d, int32_t i)
 	if (k == ARMI_K12)
 	  emit_dm(as, ARMI_MOV, d, r);
 	else
-	  emit_dn(as, ARMI_ADD^k, d, r);
+	  emit_dn(as, ARMY_OP_BODY(ARMI_ADD, k), d, r);
 	return 1;
       }
     }
@@ -159,8 +184,8 @@ static int emit_kdelta2(ASMState *as, Reg d, int32_t i)
 	k2 = emit_isk12(0, delta & (255 << sh));
 	k = emit_isk12(0, delta & ~(255 << sh));
 	if (k) {
-	  emit_dn(as, ARMI_ADD^k2^inv, d, d);
-	  emit_dn(as, ARMI_ADD^k^inv, d, r);
+	  emit_dn(as, ARMY_OP_BODY(ARMI_ADD^inv, k2), d, d);
+	  emit_dn(as, ARMY_OP_BODY(ARMI_ADD^inv, k), d, r);
 	  return 1;
 	}
       }
@@ -197,10 +222,10 @@ static void emit_loadi(ASMState *as, Reg r, int32_t i)
       int32_t m = i & (255 << sh);
       i &= ~(255 << sh);
       if (i == 0) {
-	emit_d(as, ARMI_MOV ^ emit_isk12(0, m), r);
+	emit_d(as, ARMY_OP_BODY(ARMI_MOV, emit_isk12(0, m)), r);
 	break;
       }
-      emit_dn(as, ARMI_ORR ^ emit_isk12(0, m), r, r);
+      emit_dn(as, ARMY_OP_BODY(ARMI_ORR, emit_isk12(0, m)), r, r);
     }
   }
 }
@@ -226,7 +251,7 @@ static void emit_loadn(ASMState *as, Reg r, cTValue *tv)
     uint32_t hi = tv->u32.hi;
     uint32_t b = ((hi >> 22) & 0x1ff);
     if (!(hi & 0xffff) && (b == 0x100 || b == 0x0ff)) {
-      *--as->mcp = ARMI_VMOVI_D | ARMF_D(r & 15) |
+      *--as->mcp = ARMY_D(ARMI_VMOVI_D, r & 15) |
 		   ((tv->u32.hi >> 12) & 0x00080000) |
 		   ((tv->u32.hi >> 4) & 0x00070000) |
 		   ((tv->u32.hi >> 16) & 0x0000000f);
@@ -261,7 +286,7 @@ static void emit_branch(ASMState *as, ARMIns ai, MCode *target)
   MCode *p = as->mcp;
   ptrdiff_t delta = (target - p) - 1;
   lua_assert(((delta + 0x00800000) >> 24) == 0);
-  *--p = ai | ((uint32_t)delta & 0x00ffffffu);
+  *--p = ARMY_B(ai, (uint32_t)delta);
   as->mcp = p;
 }
 
@@ -273,12 +298,12 @@ static void emit_call(ASMState *as, void *target)
   ptrdiff_t delta = ((char *)target - (char *)p) - 8;
   if ((((delta>>2) + 0x00800000) >> 24) == 0) {
     if ((delta & 1))
-      *p = ARMI_BLX | ((uint32_t)(delta>>2) & 0x00ffffffu) | ((delta&2) << 27);
+      *p = ARMY_B(ARMI_BLX, (uint32_t)(delta>>2)) | ((delta&2) << 27);
     else
-      *p = ARMI_BL | ((uint32_t)(delta>>2) & 0x00ffffffu);
+      *p = ARMY_B(ARMI_BL, (uint32_t)(delta>>2));
   } else {  /* Target out of range: need indirect call. But don't use R0-R3. */
     Reg r = ra_allock(as, i32ptr(target), RSET_RANGE(RID_R4, RID_R12+1));
-    *p = ARMI_BLXr | ARMF_M(r);
+    *p = ARMY_M(ARMI_BLXr, r);
   }
 }
 
@@ -305,7 +330,7 @@ static void emit_movrr(ASMState *as, IRIns *ir, Reg dst, Reg src)
 	*as->mcp = ins ^ (swp << 12);  /* Swap D in store. */
     }
   }
-  emit_dm(as, ARMI_MOV, dst, src);
+  emit_dm2(as, ARMI_MOV, dst, src);
 }
 
 /* Generic load of register from stack slot. */
@@ -340,7 +365,7 @@ static void emit_opk(ASMState *as, ARMIns ai, Reg dest, Reg src,
 {
   uint32_t k = emit_isk12(ai, i);
   if (k)
-    emit_dn(as, ai^k, dest, src);
+    emit_dn(as, ARMY_OP_BODY(ai, k), dest, src);
   else
     emit_dnm(as, ai, dest, src, ra_allock(as, i, allow));
 }
