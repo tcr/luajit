@@ -290,7 +290,7 @@ local map_op = {
   -- ["b_1"] = "B:1101cccciiiiiiii|B:11100iiiiiiiiiii",
   ["b.w_1"] = "sB:11110scccciiiiii10j0kiiiiiiiiiii|sB:11110siiiiiiiiii10j1kiiiiiiiiiii",
   ["bfc_3"] = "dim:11110011011011110iiiddddii0mmmmm",
-  ["bfi_4"] = "dnim:111100110110nnnn0iiiddddii0mmmmm",
+  ["bfi_4"] = "dnij:111100110110nnnn0iiiddddii0jjjjj",
   ["bic.w_3"] = "sdni:11110H00001snnnn0HHHddddHHHHHHHH|sdnmT:11101010001snnnn0iiiddddiiTTmmmm",
   ["bic.w_4"] = "sdnmT:11101010001snnnn0iiiddddiiTTmmmm",
   ["bic_2"] = "sdm:0100001110mmmddd",
@@ -390,7 +390,7 @@ local map_op = {
   ["sbc.w_3"] = "sdni:11110H01011snnnn0HHHddddHHHHHHHH|sdnmT:11101011011snnnn0iiiddddiiTTmmmm",
   ["sbc.w_4"] = "sdnmT:11101011011snnnn0iiiddddiiTTmmmm",
   ["sbc_2"] = "sdm:0100000110mmmddd",
-  ["sbfx_4"] = "sdniw:111100110100nnnn0iiiddddii0wwwww",
+  ["sbfx_4"] = "dniJ:111100110100nnnn0iiiddddii0JJJJJ",
   ["sdiv_3"] = "dnm:111110111001nnnn1111dddd1111mmmm",
   ["sel_3"] = "dnm:111110101010nnnn1111dddd1000mmmm",
   ["smlal_4"] = "lhnm:111110111100nnnnllllhhhh0000mmmm",
@@ -815,16 +815,24 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
     end
 
     -- Immediate values
-    if p == 'i' then
+    if p == 'i' or p == 'j' or p == 'J' then
       local imm = match(params[n], "^#(.*)$")
       if not imm then
         werror('bad immediate (i) operand')
       end
 
-      if bits['i'] then
-        values[p] = parse_imm(imm, bits['i'], shifts['i'], 0, 0, instrlen)
+      if bits[p] then
+        values[p] = parse_imm(imm, bits[p], shifts[p], 0, 0, instrlen)
         if values[p] >= math.pow(2, bits[p]) then
           werror('immediate operand larger than ' .. bits[p] .. ' bits')
+        end
+
+        if p == 'j' then
+          values[p] = values['i'] + values[p] - 1
+        end
+
+        if p == 'J' then
+          values[p] = values[p] - 1
         end
 
       elseif bits['f'] then

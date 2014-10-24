@@ -144,21 +144,36 @@ typedef struct {
 
 /* Instruction fields. */
 #define ARMF_CC(ai, cc)	(((ai) ^ ARMI_CCAL) | ((cc) << 28))
-#define ARMF_N(r)	((r) << 16)
-#define ARMF_D(r)	((r) << 12)
+#define ARMF_N(r)	((r) << 0)
+#define ARMF_T(r) ((r) << 28)
+#define ARMF_D(r)	((r) << 24)
 #define ARMF_S(r)	((r) << 8)
-#define ARMF_M(r)	(r)
+#define ARMF_M(r)	((r) << 8)
+#define ARMF_M2(r) ((r) << 16) // MOV
 #define ARMF_SH(sh, n)	(((sh) << 5) | ((n) << 7))
 #define ARMF_RSH(sh, r)	(0x10 | ((sh) << 5) | ARMF_S(r))
 
+/* Instruction compositing */
+#define ARMY_SUB(arg, rsh, mask) (((arg)>>rsh)&(((1<<(mask))-1)))
+#define ARMY_K12(A, B) ((A^ARMI_K12)|(((B)&0xff)<<16)|(((B)&0x700)<<20)|(((B)&0x800)>>1))
+#define ARMY_OP_BODY(A, B) ((A)^(B))
+#define ARMY_B(A, B) ((A)|(ARMY_SUB(B,0,10)<<17)|ARMY_SUB(B,10,10)|(ARMY_SUB(B,20,1)<<28)|(ARMY_SUB(B,21,1)<<29)|(ARMY_SUB(B,22,1)<<10))
+
 typedef enum ARMIns {
   ARMI_CCAL = 0xe0000000,
-  ARMI_S = 0x000100000,
-  ARMI_K12 = 0x02000000,
+
+  // ARMI_S = 0x000100000,
+  ARMI_S = 0x00000001,
+
+  // ARMI_K12 = 0x02000000,
+  ARMI_K12 = 0x00001a00,
+
   ARMI_KNEG = 0x00200000,
   ARMI_LS_W = 0x00200000,
-  ARMI_LS_U = 0x00800000,
-  ARMI_LS_P = 0x01000000,
+  ARMI_LS_U = 0x02000000,
+  // ARMI_LS_U = 0x00800000,
+  ARMI_LS_P = 0x04000000,
+  // ARMI_LS_P = 0x01000000,
   ARMI_LS_R = 0x02000000,
   ARMI_LSX_I = 0x00400000,
 
@@ -174,9 +189,12 @@ typedef enum ARMIns {
   // 11110H01110snnnn0HHHddddHHHHHHHH
   // 11101011110snnnn0iiiddddiiTTmmmm
   ARMI_RSB = 0xe0600000,
+  
   // 11110H01000snnnn0HHHddddHHHHHHHH
   // 11101011000snnnn0iiiddddiiTTmmmm
-  ARMI_ADD = 0xe0800000,
+  ARMI_ADD = 0x0000eb00,
+  // ARMI_ADD = 0xe0800000,
+
   // 11110H01010snnnn0HHHddddHHHHHHHH
   // 11101011010snnnn0iiiddddiiTTmmmm
   ARMI_ADC = 0xe0a00000,
@@ -191,18 +209,26 @@ typedef enum ARMIns {
   // 11110H001001nnnn0HHH1111HHHHHHHH
   // 111010101001nnnn0iii1111iiTTmmmm
   ARMI_TEQ = 0xe1300000,
+
   // 11110H011011nnnn0HHH1111HHHHHHHH
   // 111010111011nnnn0iii1111iiTTmmmm
-  ARMI_CMP = 0xe1500000,
-  // 11110H011011nnnn0HHH1111HHHHHHHH
-  // 111010111011nnnn0iii1111iiTTmmmm
-  ARMI_CMN = 0xe1700000,
+  ARMI_CMP = 0x0f00ebb0,
+  // ARMI_CMP = 0xe1500000,
+  
+  // 11110H010001nnnn0HHH1111HHHHHHHH
+  // 111010110001nnnn0iii1111iiTTmmmm
+  ARMI_CMN = 0x0f00eb10,
+  // ARMI_CMN = 0xe1700000,
+
   // 11110H00010snnnn0HHHddddHHHHHHHH
   // 11101010010snnnn0iiiddddiiTTmmmm
-  ARMI_ORR = 0xe1800000,
+  ARMI_ORR = 0x0000ea40,
+  
   // 11110H00010s11110HHHddddHHHHHHHH
   // 11101010010s11110000dddd0000mmmm
-  ARMI_MOV = 0xe1a00000,
+  ARMI_MOV = 0x0000ea4f,
+  // ARMI_MOV = 0xe1a00000,
+
   // 11110H00001snnnn0HHHddddHHHHHHHH
   // 11101010001snnnn0iiiddddiiTTmmmm
   ARMI_BIC = 0xe1c00000,
@@ -224,7 +250,12 @@ typedef enum ARMIns {
   // tL:111110000101nnnntttt1PUWiiiiiiii
   // tL:111110000101nnnntttt000000iimmmm
   // tB:11111000u1011111ttttiiiiiiiiiiii
-  ARMI_LDR = 0xe4100000,
+  ARMI_LDR = 0x0800f850,
+  // ARMI_LDR = 0xe4100000,
+
+  // tL:111110001101nnnnttttiiiiiiiiiiii
+  ARMI_LDRT = 0x0000f8d0,
+
   // tL:111110000001nnnntttt1PUWiiiiiiii
   // tL:111110000001nnnntttt000000iimmmm
   // tL:111110001001nnnnttttiiiiiiiiiiii
@@ -247,10 +278,13 @@ typedef enum ARMIns {
   // tdLi:1110100PU1W1nnnnttttddddffffffff
   // tdB:1110100PU1W11111ttttddddiiiiiiii
   ARMI_LDRD = 0xe00000d0,
+  
   // tL:111110001100nnnnttttiiiiiiiiiiii
   // tL:111110000100nnnntttt1PUWiiiiiiii
   // tL:111110000100nnnntttt000000iimmmm
-  ARMI_STR = 0xe4000000,
+  ARMI_STR = 0x0800f840,
+  // ARMI_STR = 0xe4000000,
+
   // tL:111110001000nnnnttttiiiiiiiiiiii
   // tL:111110000000nnnntttt1PUWiiiiiiii
   // tL:111110000000nnnntttt000000iimmmm
@@ -266,11 +300,17 @@ typedef enum ARMIns {
 
   // 11110scccciiiiii10j0kiiiiiiiiiii
   // 11110siiiiiiiiii10j1kiiiiiiiiiii
-  ARMI_B = 0xea000000,
+  ARMI_B = 0xb800f000,
+  // ARMI_B = 0xea000000,
+
   // 11110siiiiiiiiii11J1Kiiiiiiiiiii
-  ARMI_BL = 0xeb000000,
+  ARMI_BL = 0xf800f000,
+  // ARMI_BL = 0xeb000000,
+
   // 010001111mmmm000
-  ARMI_BLX = 0xfa000000,
+  ARMI_BLX = 0x4780bf00,
+  // ARMI_BLX = 0xfa000000,
+
   // 010001111mmmm000
   ARMI_BLXr = 0xe12fff30,
 

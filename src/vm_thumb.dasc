@@ -2207,21 +2207,31 @@ static void build_subroutines(BuildCtx *ctx)
   |.if JIT
   |  sub sp, sp, #12
   |  push {r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12}
+  // CARG1 = exit instruction pc
   |  ldr CARG1, [sp, #64]	// Load original value of lr.
-  |   ldr DISPATCH, [lr]	// Load DISPATCH.
+  |   ldr DISPATCH, [lr, #-1]	// Load DISPATCH.
   |    add CARG3, sp, #64	// Recompute original value of sp.
   |   mv_vmstate CARG4, EXIT
   |    str CARG3, [sp, #52]	// Store sp in RID_SP
   |   st_vmstate CARG4
-  |  ldr CARG2, [CARG1, #-4]!	// Get exit instruction.
+  // CARG2 = exit branch ins
+  |  ldr CARG4, [CARG1, #-5]!	// Get exit instruction.
   |   str CARG1, [sp, #56]	// Store exit pc in RID_LR and RID_PC.
   |   str CARG1, [sp, #60]
   |.if FPU
   |  vpush {d0-d15}
   |.endif
-  |  lsl CARG2, CARG2, #8
-  |  add CARG1, CARG1, CARG2, asr #6
-  |   ldr CARG2, [lr, #4]	// Load exit stub group offset.
+  // CARG2 = branch ins << 2
+  //|  lsl CARG2, CARG2, #8
+  |  sbfx CARG2, CARG4, #10, #1
+  |  bfi CARG2, CARG4, #11, #10
+  |  lsr CARG4, CARG4, #16
+  |  bfi CARG2, CARG4, #0, #11
+  // CARG1 = exit instruction pc + branch
+  //  add CARG1, CARG1, CARG2, asr #2
+  |  add CARG1, CARG1, CARG2, lsl #1
+  |   ldr CARG2, [lr, #+7]	// Load exit stub group offset.
+  // CARG1 = exit instruction pc + branch - lr
   |   sub CARG1, CARG1, lr
   |  ldr L, [DISPATCH, #DISPATCH_GL(jit_L)]
   |   add CARG1, CARG2, CARG1, lsr #2	// Compute exit number.

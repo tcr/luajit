@@ -5,20 +5,19 @@
 
 #define _W(A) A
 
-#define ARMY_K12(A, B) (_W(A)|_W(ARMI_K12)|_W(B))
-#define ARMY_OP_BODY(A, B) (_W(A)^_W(B))
-#define ARMY_B(A, B) (_W(A)|((_W(B))&0x00ffffffu))
 // P U W and I flags
 #define ARMY_FLAG(A, B) (_W(A)|_W(B))
-#define ARMY_OFS(A, B) (_W(A)|_W(B))
+#define ARMY_OFS(A, B) (_W(A)|(_W(B)<<16))
 
-#define ARMY_DNM(ai, rd, rn, rm) (ai | ARMF_D(rd) | ARMF_N(rn) | ARMF_M(rm))
-#define ARMY_DN(ai, rd, rn) (ai | ARMF_D(rd) | ARMF_N(rn))
-#define ARMY_DM(ai, rd, rm) (ai | ARMF_D(rd) | ARMF_M(rm))
-#define ARMY_NM(ai, rn, rm) (ai | ARMF_N(rn) | ARMF_M(rm))
-#define ARMY_D(ai, rd) (ai | ARMF_D(rd))
-#define ARMY_N(ai, rn) (ai | ARMF_N(rn))
-#define ARMY_M(ai, rm) (ai | ARMF_M(rm))
+#define ARMY_DNM(ai, rd, rn, rm) ((ai) | ARMF_D(rd) | ARMF_N(rn) | ARMF_M(rm))
+#define ARMY_DN(ai, rd, rn) ((ai) | ARMF_D(rd) | ARMF_N(rn))
+#define ARMY_TN(ai, rd, rn) ((ai) | ARMF_T(rd) | ARMF_N(rn))
+#define ARMY_DM(ai, rd, rm) ((ai) | ARMF_D(rd) | ARMF_M(rm))
+#define ARMY_DM2(ai, rd, rm) ((ai) | ARMF_D(rd) | ARMF_M2(rm))
+#define ARMY_NM(ai, rn, rm) ((ai) | ARMF_N(rn) | ARMF_M(rm))
+#define ARMY_D(ai, rd) ((ai) | ARMF_D(rd))
+#define ARMY_N(ai, rn) ((ai) | ARMF_N(rn))
+#define ARMY_M(ai, rm) ((ai) | ARMF_M(rm))
 
 /* -- Constant encoding --------------------------------------------------- */
 
@@ -45,17 +44,23 @@ static uint8_t emit_invai[16] = {
 static uint32_t emit_isk12(ARMIns ai, int32_t n)
 {
   uint32_t invai, i, m = (uint32_t)n;
-  /* K12: unsigned 8 bit value, rotated in steps of two bits. */
-  for (i = 0; i < 4096; i += 256, m = lj_rol(m, 2))
-    if (m <= 255) return ARMY_K12(0, m|i);
+  /* K12: unsigned 8 bit value, rotated in steps of one bit. */
+  for (i = 0; i < 4096; i += 128, m = lj_rol(m, 1))
+    if (m <= 255) {
+      if (m & 0x80 && i > 128*8) return ARMY_K12(0, i|(m & 0x7f));
+      else if (i < 128*8) return ARMY_K12(0, m & 0xff);
+    }
   /* Otherwise try negation/complement with the inverse instruction. */
   invai = emit_invai[((ai >> 21) & 15)];
   if (!invai) return 0;  /* Failed. No inverse instruction. */
   m = ~(uint32_t)n;
   if (invai == ((ARMI_SUB^ARMI_ADD) >> 21) ||
       invai == (ARMI_CMP^ARMI_CMN) >> 21) m++;
-  for (i = 0; i < 4096; i += 256, m = lj_rol(m, 2))
-    if (m <= 255) return ARMY_K12(invai<<21, m|i);
+  for (i = 0; i < 4096; i += 128, m = lj_rol(m, 1))
+    if (m <= 255) {
+      if (m & 0x80 && i > 128*8) return ARMY_K12(invai<<21, i|(m & 0x7f));
+      else if (i < 128*8) return ARMY_K12(invai<<21, m & 0xff);
+    }
   return 0;  /* Failed. */
 }
 
@@ -64,6 +69,11 @@ static uint32_t emit_isk12(ARMIns ai, int32_t n)
 static void emit_dnm(ASMState *as, ARMIns ai, Reg rd, Reg rn, Reg rm)
 {
   *--as->mcp = ARMY_DNM(ai, rd, rn, rm);
+}
+
+static void emit_dm2(ASMState *as, ARMIns ai, Reg rd, Reg rm)
+{
+  *--as->mcp = ARMY_DM2(ai, rd, rm);
 }
 
 static void emit_dm(ASMState *as, ARMIns ai, Reg rd, Reg rm)
@@ -116,8 +126,8 @@ static void emit_lso(ASMState *as, ARMIns ai, Reg rd, Reg rn, int32_t ofs)
     emit_lsox(as, ai == ARMI_LDR ? ARMI_LDRD : ARMI_STRD, rd&~1, rn, ofs&~4);
     return;
   }
-  if (ofs < 0) ofs = -ofs; else ai |= ARMI_LS_U;
-  *--as->mcp = ARMY_OFS(ARMY_DN(ARMY_FLAG(ai, ARMI_LS_P), rd, rn), ofs);
+  if (ofs < 0) ofs = -ofs; else ai = ARMY_FLAG(ai, ARMI_LS_U);
+  *--as->mcp = ARMY_OFS(ARMY_TN(ARMY_FLAG(ai, ARMI_LS_P), rd, rn), ofs);
 }
 
 #if !LJ_SOFTFP
@@ -322,7 +332,7 @@ static void emit_movrr(ASMState *as, IRIns *ir, Reg dst, Reg src)
 	*as->mcp = ins ^ (swp << 12);  /* Swap D in store. */
     }
   }
-  emit_dm(as, ARMI_MOV, dst, src);
+  emit_dm2(as, ARMI_MOV, dst, src);
 }
 
 /* Generic load of register from stack slot. */
