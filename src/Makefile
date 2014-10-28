@@ -375,7 +375,7 @@ ifeq (,$(HOST_LUA))
 endif
 
 DASM_DIR= ../dynasm
-DASM= luajit $(DASM_DIR)/dynasm.lua
+DASM= $(HOST_LUA) $(DASM_DIR)/dynasm.lua
 DASM_XFLAGS=
 DASM_AFLAGS=
 DASM_ARCH= $(TARGET_LJARCH)
