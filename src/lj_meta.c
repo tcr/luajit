@@ -19,6 +19,8 @@
 #include "lj_bc.h"
 #include "lj_vm.h"
 #include "lj_strscan.h"
+#include "lj_func.h"
+#include "lauxlib.h"
 
 /* -- Metamethod handling ------------------------------------------------- */
 
@@ -120,6 +122,28 @@ static TValue *mmcall(lua_State *L, ASMFunction cont, cTValue *mo,
   return top+2;  /* Return new base. */
 }
 
+#if LJ_COLONY
+
+int colony_gettable (lua_State*L) {
+  if (!luaL_callmeta(L, 2, "__tostring")) {  /* no metafield? */
+    lua_pushliteral(L, "");
+  }
+  lua_gettable(L, 1);
+  return 1;
+}
+
+int colony_settable (lua_State*L) {
+  if (!luaL_callmeta(L, 2, "__tostring")) {  /* no metafield? */
+    // key = lua_tostring(L, -1);
+    lua_pushliteral(L, "");
+  }
+  lua_pushvalue(L, 3);
+  lua_settable(L, 1);
+  return 0;
+}
+
+#endif
+
 /* -- C helpers for some instructions, called from assembler VM ----------- */
 
 /* Helper for TGET*. __index chain and metamethod. */
@@ -154,8 +178,14 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
   } else if (tvisbool(k)) {
     setstrV(L, &tmp, lj_str_newz(L, boolV(k) ? "true" : "false"));
     k = &tmp;
+  } else if (tvistab(k) || tvisfunc(k)) {
+    GCfunc *fn = lj_func_newC(L, 2, tabref(L->env));
+    fn->c.f = colony_gettable;
+    TValue mo;
+    setfuncV(L, &mo, fn);
+    L->top = mmcall(L, lj_cont_ra, &mo, o, k);
+    return NULL;
   }
-  // TODO tostring tables
 #endif
   int loop;
   for (loop = 0; loop < LJ_MAX_IDXCHAIN; loop++) {
@@ -213,8 +243,14 @@ TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k)
   } else if (tvisbool(k)) {
     setstrV(L, &tmp, lj_str_newz(L, boolV(k) ? "true" : "false"));
     k = &tmp;
+  } else if (tvistab(k) || tvisfunc(k)) {
+    GCfunc *fn = lj_func_newC(L, 3, tabref(L->env));
+    fn->c.f = colony_settable;
+    TValue mo;
+    setfuncV(L, &mo, fn);
+    L->top = mmcall(L, lj_cont_ra, &mo, o, k);
+    return NULL;
   }
-  // TODO tostring tables
 #endif
   int loop;
   for (loop = 0; loop < LJ_MAX_IDXCHAIN; loop++) {

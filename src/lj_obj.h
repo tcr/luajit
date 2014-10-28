@@ -510,6 +510,9 @@ typedef struct GCState {
 
 /* Global state, shared by all threads of a Lua universe. */
 typedef struct global_State {
+#if LJ_COLONY
+  GCfunc *settable, *gettable;
+#endif
   GCRef *strhash;	/* String hash table (hash chain anchors). */
   MSize strmask;	/* String hash mask (size of hash table - 1). */
   MSize strnum;		/* Number of strings in hash table. */
