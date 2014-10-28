@@ -178,8 +178,14 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
   } else if (tvisbool(k)) {
     setstrV(L, &tmp, lj_str_newz(L, boolV(k) ? "true" : "false"));
     k = &tmp;
+  } else if (tvistab(k) || tvisfunc(k)) {
+    GCfunc *fn = lj_func_newC(L, 2, tabref(L->env));
+    fn->c.f = colony_gettable;
+    TValue mo;
+    setfuncV(L, &mo, fn);
+    L->top = mmcall(L, lj_cont_ra, &mo, o, k);
+    return NULL;
   }
-  // TODO tostring tables
 #endif
   int loop;
   for (loop = 0; loop < LJ_MAX_IDXCHAIN; loop++) {
@@ -237,8 +243,14 @@ TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k)
   } else if (tvisbool(k)) {
     setstrV(L, &tmp, lj_str_newz(L, boolV(k) ? "true" : "false"));
     k = &tmp;
+  } else if (tvistab(k) || tvisfunc(k)) {
+    GCfunc *fn = lj_func_newC(L, 3, tabref(L->env));
+    fn->c.f = colony_settable;
+    TValue mo;
+    setfuncV(L, &mo, fn);
+    L->top = mmcall(L, lj_cont_ra, &mo, o, k);
+    return NULL;
   }
-  // TODO tostring tables
 #endif
   int loop;
   for (loop = 0; loop < LJ_MAX_IDXCHAIN; loop++) {
