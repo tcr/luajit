@@ -808,7 +808,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
       end
 
       values[p] = parse_imm_long(imm)
-      if values[p] >= math.pow(2, bits[p]) then
+      if values[p] >= (2 ^ bits[p]) then
         werror('immediate operand larger than ' .. bits[p] .. ' bits')
       end
     end
@@ -822,13 +822,13 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
 
       if bits['i'] then
         values[p] = parse_imm(imm, bits['i'], shifts['i'], 0, 0, instrlen)
-        if values[p] >= math.pow(2, bits[p]) then
+        if values[p] >= (2 ^ bits[p]) then
           werror('immediate operand larger than ' .. bits[p] .. ' bits')
         end
 
       elseif bits['f'] then
         values['f'] = parse_imm(imm, bits['f'], shifts['i'], 2, 0, instrlen)
-        if values['f'] >= math.pow(2, bits['f']) then
+        if values['f'] >= (2 ^ bits['f']) then
           werror('immediate operand larger than ' .. bits['f'] .. ' bits')
         end
 
