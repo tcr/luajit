@@ -823,7 +823,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
 
       if bits[p] then
         values[p] = parse_imm(imm, bits[p], shifts[p], 0, 0, instrlen)
-        if values[p] >= math.pow(2, bits[p]) then
+        if values[p] >= (2 ^ bits[p]) then
           werror('immediate operand larger than ' .. bits[p] .. ' bits')
         end
 
