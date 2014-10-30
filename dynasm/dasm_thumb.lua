@@ -970,7 +970,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
           end
           
           values['n'] = d
-          if values['n'] and values['n'] >= shl(1, bits['n']) then
+          if values['n'] ~= nil and (not bits['n'] or values['n'] >= shl(1, bits['n'])) then
             werror('invalid size of register')
           end
 
@@ -992,7 +992,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
           local p3 = params[n+2]
 
           values['n'] = parse_gpr(p1)
-          if values['n'] and values['n'] >= shl(1, bits['n']) then
+          if values['n'] ~= nil and (not bits['n'] or values['n'] >= shl(1, bits['n'])) then
             werror('invalid size of register')
           end
 
@@ -1029,7 +1029,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
 
           local p1a, p2 = match(p1, "^([^,%s]*)%s*(.*)$")
           values['n'] = parse_gpr(p1a)
-          if values['n'] ~= nil and values['n'] >= shl(1, bits['n']) then
+          if values['n'] ~= nil and (not bits['n'] or values['n'] >= shl(1, bits['n'])) then
             werror('invalid size of register')
           end
 
