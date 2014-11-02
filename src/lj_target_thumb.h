@@ -144,72 +144,192 @@ typedef struct {
 
 /* Instruction fields. */
 #define ARMF_CC(ai, cc)	(((ai) ^ ARMI_CCAL) | ((cc) << 28))
-#define ARMF_N(r)	((r) << 16)
-#define ARMF_D(r)	((r) << 12)
+#define ARMF_N(r)	((r) << 0)
+#define ARMF_T(r) ((r) << 28)
+#define ARMF_D(r)	((r) << 24)
 #define ARMF_S(r)	((r) << 8)
-#define ARMF_M(r)	(r)
+#define ARMF_M(r)	((r) << 8)
+#define ARMF_M2(r) ((r) << 16) // MOV
 #define ARMF_SH(sh, n)	(((sh) << 5) | ((n) << 7))
 #define ARMF_RSH(sh, r)	(0x10 | ((sh) << 5) | ARMF_S(r))
 
+/* Instruction compositing */
+#define ARMY_SUB(arg, rsh, mask) (((arg)>>rsh)&(((1<<(mask))-1)))
+#define ARMY_K12(A, B) ((A^ARMI_K12)|(((B)&0xff)<<16)|(((B)&0x700)<<20)|(((B)&0x800)>>1))
+#define ARMY_OP_BODY(A, B) ((A)^(B))
+#define ARMY_B(A, B) ((A)|(ARMY_SUB(B,0,10)<<17)|ARMY_SUB(B,10,10)|(ARMY_SUB(B,20,1)<<28)|(ARMY_SUB(B,21,1)<<29)|(ARMY_SUB(B,22,1)<<10))
+
 typedef enum ARMIns {
   ARMI_CCAL = 0xe0000000,
-  ARMI_S = 0x000100000,
-  ARMI_K12 = 0x02000000,
+
+  // ARMI_S = 0x000100000,
+  ARMI_S = 0x00000001,
+
+  // ARMI_K12 = 0x02000000,
+  ARMI_K12 = 0x00001a00,
+
   ARMI_KNEG = 0x00200000,
   ARMI_LS_W = 0x00200000,
-  ARMI_LS_U = 0x00800000,
-  ARMI_LS_P = 0x01000000,
+  ARMI_LS_U = 0x02000000,
+  // ARMI_LS_U = 0x00800000,
+  ARMI_LS_P = 0x04000000,
+  // ARMI_LS_P = 0x01000000,
   ARMI_LS_R = 0x02000000,
   ARMI_LSX_I = 0x00400000,
 
+  // 11110H00000snnnn0HHHddddHHHHHHHH
+  // 11101010000snnnn0iiiddddiiTTmmmm
   ARMI_AND = 0xe0000000,
+  // 11110H00100snnnn0HHHddddHHHHHHHH
+  // 11101010100snnnn0iiiddddiiTTmmmm
   ARMI_EOR = 0xe0200000,
+  // 11110H01101snnnn0HHHddddHHHHHHHH
+  // 11101011101snnnn0iiiddddiiTTmmmm
   ARMI_SUB = 0xe0400000,
+  // 11110H01110snnnn0HHHddddHHHHHHHH
+  // 11101011110snnnn0iiiddddiiTTmmmm
   ARMI_RSB = 0xe0600000,
-  ARMI_ADD = 0xe0800000,
+  
+  // 11110H01000snnnn0HHHddddHHHHHHHH
+  // 11101011000snnnn0iiiddddiiTTmmmm
+  ARMI_ADD = 0x0000eb00,
+  // ARMI_ADD = 0xe0800000,
+
+  // 11110H01010snnnn0HHHddddHHHHHHHH
+  // 11101011010snnnn0iiiddddiiTTmmmm
   ARMI_ADC = 0xe0a00000,
+  // 11110H01011snnnn0HHHddddHHHHHHHH
+  // 11101011011snnnn0iiiddddiiTTmmmm
   ARMI_SBC = 0xe0c00000,
+  // TODO fix this on thumb
   ARMI_RSC = 0xe0e00000,
+  // 11110H000001nnnn0HHH1111HHHHHHHH
+  // 111010100001nnnn0iii1111iiTTmmmm
   ARMI_TST = 0xe1100000,
+  // 11110H001001nnnn0HHH1111HHHHHHHH
+  // 111010101001nnnn0iii1111iiTTmmmm
   ARMI_TEQ = 0xe1300000,
-  ARMI_CMP = 0xe1500000,
-  ARMI_CMN = 0xe1700000,
-  ARMI_ORR = 0xe1800000,
-  ARMI_MOV = 0xe1a00000,
+
+  // 11110H011011nnnn0HHH1111HHHHHHHH
+  // 111010111011nnnn0iii1111iiTTmmmm
+  ARMI_CMP = 0x0f00ebb0,
+  // ARMI_CMP = 0xe1500000,
+  
+  // 11110H010001nnnn0HHH1111HHHHHHHH
+  // 111010110001nnnn0iii1111iiTTmmmm
+  ARMI_CMN = 0x0f00eb10,
+  // ARMI_CMN = 0xe1700000,
+
+  // 11110H00010snnnn0HHHddddHHHHHHHH
+  // 11101010010snnnn0iiiddddiiTTmmmm
+  ARMI_ORR = 0x0000ea40,
+  
+  // 11110H00010s11110HHHddddHHHHHHHH
+  // 11101010010s11110000dddd0000mmmm
+  ARMI_MOV = 0x0000ea4f,
+  // ARMI_MOV = 0xe1a00000,
+
+  // 11110H00001snnnn0HHHddddHHHHHHHH
+  // 11101010001snnnn0iiiddddiiTTmmmm
   ARMI_BIC = 0xe1c00000,
+  // 11110H00011s11110HHHddddHHHHHHHH
+  // 11101010011s11110iiiddddiiTTmmmm
   ARMI_MVN = 0xe1e00000,
 
+  // 11110011101011111000000000000000
   ARMI_NOP = 0xe1a00000,
 
+  // -
+  // 111110110000nnnn1111dddd0000mmmm
   ARMI_MUL = 0xe0000090,
+  // -
+  // 111110111000nnnnllllhhhh0000mmmm
   ARMI_SMULL = 0xe0c00090,
 
-  ARMI_LDR = 0xe4100000,
+  // tL:111110001101nnnnttttiiiiiiiiiiii
+  // tL:111110000101nnnntttt1PUWiiiiiiii
+  // tL:111110000101nnnntttt000000iimmmm
+  // tB:11111000u1011111ttttiiiiiiiiiiii
+  ARMI_LDR = 0x0800f850,
+  // ARMI_LDR = 0xe4100000,
+
+  // tL:111110001101nnnnttttiiiiiiiiiiii
+  ARMI_LDRT = 0x0000f8d0,
+
+  // tL:111110000001nnnntttt1PUWiiiiiiii
+  // tL:111110000001nnnntttt000000iimmmm
+  // tL:111110001001nnnnttttiiiiiiiiiiii
+  // tB:11111000u0011111ttttiiiiiiiiiiii
   ARMI_LDRB = 0xe4500000,
+  // tL:111110001011nnnnttttiiiiiiiiiiii
+  // tL:111110000011nnnntttt1PUWiiiiiiii
+  // tL:111110000011nnnntttt000000iimmmm
+  // tB:11111000u0111111ttttiiiiiiiiiiii
   ARMI_LDRH = 0xe01000b0,
+  // tL:111110011001nnnnttttiiiiiiiiiiii
+  // tL:111110010001nnnntttt1PUWiiiiiiii
+  // tL:111110010001nnnntttt000000iimmmm
   ARMI_LDRSB = 0xe01000d0,
+  // tL:111110011011nnnnttttiiiiiiiiiiii
+  // tL:111110010011nnnntttt1PUWiiiiiiii
+  // tL:111110010011nnnntttt000000iimmmm
+  // tB:11111001u0111111ttttiiiiiiiiiiii
   ARMI_LDRSH = 0xe01000f0,
+  // tdLi:1110100PU1W1nnnnttttddddffffffff
+  // tdB:1110100PU1W11111ttttddddiiiiiiii
   ARMI_LDRD = 0xe00000d0,
-  ARMI_STR = 0xe4000000,
+  
+  // tL:111110001100nnnnttttiiiiiiiiiiii
+  // tL:111110000100nnnntttt1PUWiiiiiiii
+  // tL:111110000100nnnntttt000000iimmmm
+  ARMI_STR = 0x0800f840,
+  // ARMI_STR = 0xe4000000,
+
+  // tL:111110001000nnnnttttiiiiiiiiiiii
+  // tL:111110000000nnnntttt1PUWiiiiiiii
+  // tL:111110000000nnnntttt000000iimmmm
   ARMI_STRB = 0xe4400000,
+  // tL:111110001010nnnnttttiiiiiiiiiiii
+  // tL:111110000010nnnntttt1PUWiiiiiiii
   ARMI_STRH = 0xe00000b0,
+  // tdL:1110100PU1W0nnnnttttddddffffffff
   ARMI_STRD = 0xe00000f0,
+  // r:1110100100101101rrrrrrrrrrrrrrrr
+  // t:1111100001001101tttt110100000100
   ARMI_PUSH = 0xe92d0000,
 
-  ARMI_B = 0xea000000,
-  ARMI_BL = 0xeb000000,
-  ARMI_BLX = 0xfa000000,
+  // 11110scccciiiiii10j0kiiiiiiiiiii
+  // 11110siiiiiiiiii10j1kiiiiiiiiiii
+  ARMI_B = 0xb800f000,
+  // ARMI_B = 0xea000000,
+
+  // 11110siiiiiiiiii11J1Kiiiiiiiiiii
+  ARMI_BL = 0xf800f000,
+  // ARMI_BL = 0xeb000000,
+
+  // 010001111mmmm000
+  ARMI_BLX = 0x4780bf00,
+  // ARMI_BLX = 0xfa000000,
+
+  // 010001111mmmm000
   ARMI_BLXr = 0xe12fff30,
 
   /* ARMv6 */
+  // 111110101001mmmm1111dddd1000xxxx
   ARMI_REV = 0xe6bf0f30,
+  // 11111010010011111111dddd10rrmmmm
   ARMI_SXTB = 0xe6af0070,
+  // 11111010000011111111dddd10rrmmmm
   ARMI_SXTH = 0xe6bf0070,
+  // 11111010010111111111dddd10rrmmmm
   ARMI_UXTB = 0xe6ef0070,
+  // 11111010000111111111dddd10rrmmmm
   ARMI_UXTH = 0xe6ff0070,
 
   /* ARMv6T2 */
+  // 11110H100100kkkk0HHHddddHHHHHHHH
   ARMI_MOVW = 0xe3000000,
+  // 11110H101100kkkk0HHHddddHHHHHHHH
   ARMI_MOVT = 0xe3400000,
 
   /* VFP */

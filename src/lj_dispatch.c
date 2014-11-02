@@ -320,7 +320,7 @@ LUA_API int lua_sethook(lua_State *L, lua_Hook func, int mask, int count)
   g->hookcount = g->hookcstart = (int32_t)count;
   g->hookmask = (uint8_t)((g->hookmask & ~HOOK_EVENTMASK) | mask);
   lj_trace_abort(g);  /* Abort recording on any hook change. */
-  // lj_dispatch_update(g);
+  lj_dispatch_update(g);
   return 1;
 }
 

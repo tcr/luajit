@@ -169,8 +169,10 @@ IRFLDEF(FLOFS)
 
 #if LJ_TARGET_X86ORX64
 #include "lj_emit_x86.h"
-#elif LJ_TARGET_ARM || LJ_TARGET_THUMB
+#elif LJ_TARGET_ARM
 #include "lj_emit_arm.h"
+#elif LJ_TARGET_THUMB
+#include "lj_emit_thumb.h"
 #elif LJ_TARGET_PPC
 #include "lj_emit_ppc.h"
 #elif LJ_TARGET_MIPS
@@ -1328,8 +1330,10 @@ static void asm_loop(ASMState *as)
 
 #if LJ_TARGET_X86ORX64
 #include "lj_asm_x86.h"
-#elif LJ_TARGET_ARM || LJ_TARGET_THUMB
+#elif LJ_TARGET_ARM
 #include "lj_asm_arm.h"
+#elif LJ_TARGET_THUMB
+#include "lj_asm_thumb.h"
 #elif LJ_TARGET_PPC
 #include "lj_asm_ppc.h"
 #elif LJ_TARGET_MIPS
