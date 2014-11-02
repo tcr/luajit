@@ -290,7 +290,7 @@ local map_op = {
   -- ["b_1"] = "B:1101cccciiiiiiii|B:11100iiiiiiiiiii",
   ["b.w_1"] = "sB:11110scccciiiiii10j0kiiiiiiiiiii|sB:11110siiiiiiiiii10j1kiiiiiiiiiii",
   ["bfc_3"] = "dim:11110011011011110iiiddddii0mmmmm",
-  ["bfi_4"] = "dnim:111100110110nnnn0iiiddddii0mmmmm",
+  ["bfi_4"] = "dnij:111100110110nnnn0iiiddddii0jjjjj",
   ["bic.w_3"] = "sdni:11110H00001snnnn0HHHddddHHHHHHHH|sdnmT:11101010001snnnn0iiiddddiiTTmmmm",
   ["bic.w_4"] = "sdnmT:11101010001snnnn0iiiddddiiTTmmmm",
   ["bic_2"] = "sdm:0100001110mmmddd",
@@ -390,7 +390,7 @@ local map_op = {
   ["sbc.w_3"] = "sdni:11110H01011snnnn0HHHddddHHHHHHHH|sdnmT:11101011011snnnn0iiiddddiiTTmmmm",
   ["sbc.w_4"] = "sdnmT:11101011011snnnn0iiiddddiiTTmmmm",
   ["sbc_2"] = "sdm:0100000110mmmddd",
-  ["sbfx_4"] = "sdniw:111100110100nnnn0iiiddddii0wwwww",
+  ["sbfx_4"] = "dniJ:111100110100nnnn0iiiddddii0JJJJJ",
   ["sdiv_3"] = "dnm:111110111001nnnn1111dddd1111mmmm",
   ["sel_3"] = "dnm:111110101010nnnn1111dddd1000mmmm",
   ["smlal_4"] = "lhnm:111110111100nnnnllllhhhh0000mmmm",
@@ -417,7 +417,7 @@ local map_op = {
   ["sub_2"] = "sdi:00111dddiiiiiiii|spi:101100001fffffff",
   ["sub.w_3"] = "sdni:11110H01101snnnn0HHHddddHHHHHHHH|sdnmT:11101011101snnnn0iiiddddiiTTmmmm",
   ["sub.w_4"] = "sdnmT:11101011101snnnn0iiiddddiiTTmmmm",
-  ["subw_3"] = "dni:11110H101010nnnn0HHHddddHHHHHHHH",
+  ["subw_3"] = "dnM:11110M101010nnnn0MMMddddMMMMMMMM",
   ["svc_1"] = "i:11011111iiiiiiii",
   ["sxtb_2"] = "dm:1011001001mmmddd",
   ["sxtb.w_2"] = "dmr:11111010010011111111dddd10rrmmmm",
@@ -815,16 +815,24 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
     end
 
     -- Immediate values
-    if p == 'i' then
+    if p == 'i' or p == 'j' or p == 'J' then
       local imm = match(params[n], "^#(.*)$")
       if not imm then
         werror('bad immediate (i) operand')
       end
 
-      if bits['i'] then
-        values[p] = parse_imm(imm, bits['i'], shifts['i'], 0, 0, instrlen)
+      if bits[p] then
+        values[p] = parse_imm(imm, bits[p], shifts[p], 0, 0, instrlen)
         if values[p] >= math.pow(2, bits[p]) then
           werror('immediate operand larger than ' .. bits[p] .. ' bits')
+        end
+
+        if p == 'j' then
+          values[p] = values['i'] + values[p] - 1
+        end
+
+        if p == 'J' then
+          values[p] = values[p] - 1
         end
 
       elseif bits['f'] then
@@ -837,7 +845,6 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
         -- fun encoding time!
         local val = parse_imm_thumb(imm)
         local a = shr(band(val, 0x80), 7)
-        local _bcdefgh = 0x80 + band(val, 0x7F)
         local abcdefgh = band(val, 0xFF);
         local ABCDE = 00000
 
@@ -858,16 +865,19 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
           -- 1bcdefgh 00000000 00000000 00000000
           -- ...
           -- 00000000 00000000 00000001 bcdefgh0
-          ABCDE = 8;
+          local truncval = bit.tobit(val)
           for i = 24,0,-1 do
-            if val == shl(_bcdefgh, i) then
-              break;
+            if band(truncval, 0x80) and band(truncval, 0xFF) == truncval then
+              ABCDE = i + 8
+              truncval = band(truncval, 0x7f)
+              break
             end
-            ABCDE = ABCDE + 1
+            truncval = shr(truncval, 1)
           end
-          if i == 0 then
-            werror('bad thumb expanded immediate ' + val)
+          if shl(truncval + 0x80, 32-ABCDE) ~= val then
+            werror('bad thumb expanded immediate ' .. tostring(val))
           end
+          val = truncval
         end
 
         values['H'] = shl(ABCDE, 7) + band(val, 0x7F)
