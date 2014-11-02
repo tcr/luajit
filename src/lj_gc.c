@@ -208,8 +208,12 @@ static void gc_traverse_func(global_State *g, GCfunc *fn)
     uint32_t i;
     lua_assert(fn->l.nupvalues <= funcproto(fn)->sizeuv);
     gc_markobj(g, funcproto(fn));
-    gc_markobj(g, tabref(fn->c.tab));
-    gc_traverse_tab(g, tabref(fn->c.tab));
+#if LJ_COLONY
+    if (g->lang == LANG_JS) {
+      gc_markobj(g, tabref(fn->c.tab));
+      gc_traverse_tab(g, tabref(fn->c.tab));
+    }
+#endif
     for (i = 0; i < fn->l.nupvalues; i++)  /* Mark Lua function upvalues. */
       gc_markobj(g, &gcref(fn->l.uvptr[i])->uv);
   } else {

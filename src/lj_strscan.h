@@ -31,10 +31,14 @@ LJ_FUNC int LJ_FASTCALL lj_strscan_number(GCstr *str, TValue *o);
 #endif
 
 /* Check for number or convert string to number/int in-place (!). */
-static LJ_AINLINE int lj_strscan_numberobj(TValue *o)
+static LJ_AINLINE int lj_strscan_numberobj(lua_State *L, TValue *o)
 {
 #if LJ_COLONY
-  return tvisnumber(o) || (tvisstr(o) && lj_strscan_number(strV(o), o)) || (tvisbool(o) && ((o->n = boolV(o)) || 1));
+  if (G(L)->lang == LANG_JS) {
+  	return tvisnumber(o) || (tvisstr(o) && lj_strscan_number(strV(o), o)) || (tvisbool(o) && ((o->n = boolV(o)) || 1));
+  } else {
+  	return tvisnumber(o) || (tvisstr(o) && lj_strscan_number(strV(o), o));
+  }
 #else
   return tvisnumber(o) || (tvisstr(o) && lj_strscan_number(strV(o), o));
 #endif

@@ -170,7 +170,7 @@ void LJ_FASTCALL lj_str_free(global_State *g, GCstr *s)
 /* -- Type conversions ---------------------------------------------------- */
 
 /* Print number to buffer. Canonicalizes non-finite values. */
-size_t LJ_FASTCALL lj_str_bufnum(char *s, cTValue *o)
+size_t LJ_FASTCALL lj_str_bufnum(lua_State *L, char *s, cTValue *o)
 {
   if (LJ_LIKELY((o->u32.hi << 1) < 0xffe00000)) {  /* Finite? */
     lua_Number n = o->n;
@@ -180,7 +180,11 @@ size_t LJ_FASTCALL lj_str_bufnum(char *s, cTValue *o)
     return (size_t)lua_number2str(s, n);
   } else if (((o->u32.hi & 0x000fffff) | o->u32.lo) != 0) {
 #if LJ_COLONY
-    s[0] = 'N'; s[1] = 'a'; s[2] = 'N'; return 3;
+    if (G(L)->lang == LANG_JS) {
+      s[0] = 'N'; s[1] = 'a'; s[2] = 'N'; return 3;
+    } else {
+      s[0] = 'n'; s[1] = 'a'; s[2] = 'n'; return 3;
+    }
 #else
     s[0] = 'n'; s[1] = 'a'; s[2] = 'n'; return 3;
 #endif
@@ -205,7 +209,7 @@ char * LJ_FASTCALL lj_str_bufint(char *p, int32_t k)
 GCstr * LJ_FASTCALL lj_str_fromnum(lua_State *L, const lua_Number *np)
 {
   char buf[LJ_STR_NUMBUF];
-  size_t len = lj_str_bufnum(buf, (TValue *)np);
+  size_t len = lj_str_bufnum(L, buf, (TValue *)np);
   return lj_str_new(L, buf, len);
 }
 
@@ -279,7 +283,7 @@ const char *lj_str_pushvf(lua_State *L, const char *fmt, va_list argp)
       TValue tv;
       MSize len;
       tv.n = (lua_Number)(va_arg(argp, LUAI_UACNUMBER));
-      len = (MSize)lj_str_bufnum(buf, &tv);
+      len = (MSize)lj_str_bufnum(L, buf, &tv);
       addstr(L, sb, buf, len);
       break;
       }

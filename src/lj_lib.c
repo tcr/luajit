@@ -156,7 +156,7 @@ GCstr *lj_lib_optstr(lua_State *L, int narg)
 void lj_lib_checknumber(lua_State *L, int narg)
 {
   TValue *o = L->base + narg-1;
-  if (!(o < L->top && lj_strscan_numberobj(o)))
+  if (!(o < L->top && lj_strscan_numberobj(L, o)))
     lj_err_argt(L, narg, LUA_TNUMBER);
 }
 #endif
@@ -179,7 +179,7 @@ lua_Number lj_lib_checknum(lua_State *L, int narg)
 int32_t lj_lib_checkint(lua_State *L, int narg)
 {
   TValue *o = L->base + narg-1;
-  if (!(o < L->top && lj_strscan_numberobj(o)))
+  if (!(o < L->top && lj_strscan_numberobj(L, o)))
     lj_err_argt(L, narg, LUA_TNUMBER);
   if (LJ_LIKELY(tvisint(o))) {
     return intV(o);
@@ -199,7 +199,7 @@ int32_t lj_lib_optint(lua_State *L, int narg, int32_t def)
 int32_t lj_lib_checkbit(lua_State *L, int narg)
 {
   TValue *o = L->base + narg-1;
-  if (!(o < L->top && lj_strscan_numberobj(o)))
+  if (!(o < L->top && lj_strscan_numberobj(L, o)))
     lj_err_argt(L, narg, LUA_TNUMBER);
   if (LJ_LIKELY(tvisint(o))) {
     return intV(o);
@@ -221,14 +221,26 @@ GCfunc *lj_lib_checkfunc(lua_State *L, int narg)
 GCtab *lj_lib_checktab(lua_State *L, int narg)
 {
   TValue *o = L->base + narg-1;
-  if (o < L->top) {
-    if (tvistab(o))
-      return tabV(o);
-    else if (tvisfunc(o))
-      return tabref(funcV(o)->c.tab);
+#if LJ_COLONY
+  if (G(L)->lang == LANG_JS) {
+    if (o < L->top) {
+      if (tvistab(o))
+        return tabV(o);
+      else if (tvisfunc(o))
+        return tabref(funcV(o)->c.tab);
+    }
+    lj_err_arg(L, narg, LJ_ERR_NOTABN);
+    return NULL;  /* unreachable */
+  } else {
+    if (!(o < L->top && tvistab(o)))
+      lj_err_argt(L, narg, LUA_TTABLE);
+    return tabV(o);
   }
-  lj_err_arg(L, narg, LJ_ERR_NOTABN);
-  return NULL;  /* unreachable */
+#else
+  if (!(o < L->top && tvistab(o)))
+    lj_err_argt(L, narg, LUA_TTABLE);
+  return tabV(o);
+#endif
 }
 
 GCtab *lj_lib_checktabornil(lua_State *L, int narg)
@@ -237,8 +249,10 @@ GCtab *lj_lib_checktabornil(lua_State *L, int narg)
   if (o < L->top) {
     if (tvistab(o))
       return tabV(o);
-    else if (tvisfunc(o))
+#if LJ_COLONY
+    else if (G(L)->lang == LANG_JS && tvisfunc(o))
       return tabref(funcV(o)->c.tab);
+#endif
     else if (tvisnil(o))
       return NULL;
   }

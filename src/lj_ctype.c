@@ -576,9 +576,9 @@ GCstr *lj_ctype_repr_complex(lua_State *L, void *sp, CTSize size)
   } else {
     re.n = (double)*(float *)sp; im.n = (double)((float *)sp)[1];
   }
-  len = lj_str_bufnum(buf, &re);
+  len = lj_str_bufnum(L, buf, &re);
   if (!(im.u32.hi & 0x80000000u) || im.n != im.n) buf[len++] = '+';
-  len += lj_str_bufnum(buf+len, &im);
+  len += lj_str_bufnum(L, buf+len, &im);
   buf[len] = buf[len-1] >= 'a' ? 'I' : 'i';
   return lj_str_new(L, buf, len+1);
 }
