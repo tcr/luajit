@@ -190,6 +190,9 @@ LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
   L->marked = LJ_GC_WHITE0 | LJ_GC_FIXED | LJ_GC_SFIXED;  /* Prevent free. */
   L->dummy_ffid = FF_C;
   setmref(L->glref, g);
+#if LJ_COLONY
+  G(L)->lang = LANG_JS;
+#endif
   g->gc.currentwhite = LJ_GC_WHITE0 | LJ_GC_FIXED;
   g->strempty.marked = LJ_GC_WHITE0;
   g->strempty.gct = ~LJ_TSTR;

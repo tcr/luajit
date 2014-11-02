@@ -523,6 +523,9 @@ typedef struct global_State {
   uint8_t stremptyz;	/* Zero terminator of empty string. */
   uint8_t dispatchmode;	/* Dispatch mode. */
   uint8_t vmevmask;	/* VM event mask. */
+#if LJ_COLONY
+  uint8_t lang; /* VM language setting. */
+#endif
   GCRef mainthref;	/* Link to main thread. */
   TValue registrytv;	/* Anchor for registry. */
   TValue tmptv, tmptv2;	/* Temporary TValues. */
@@ -855,5 +858,15 @@ LJ_DATA const char *const lj_obj_itypename[~LJ_TNUMX+1];
 
 /* Compare two objects without calling metamethods. */
 LJ_FUNC int lj_obj_equal(cTValue *o1, cTValue *o2);
+
+#if LJ_COLONY
+
+/* Language semantics mode */
+enum {
+  LANG_LUA = 0,
+  LANG_JS
+};
+
+#endif
 
 #endif

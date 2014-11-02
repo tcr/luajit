@@ -417,6 +417,13 @@
 |  mov tab->gclist, reg
 |.endmacro
 |
+#if LJ_COLONY
+|.macro checklangjs, target
+|  cmp byte [DISPATCH+DISPATCH_GL(lang)], 0
+|  je target
+|.endmacro
+#endif
+|
 |//-----------------------------------------------------------------------
 
 /* Generate subroutines used by opcodes and other parts of the VM. */
@@ -1459,6 +1466,7 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.ffunc_2 rawget
 #if LJ_COLONY
+  |  checklangjs >1
   |  cmp dword [BASE+4], LJ_TFUNC;  jne >1
   |  mov LFUNC:RB, [BASE]
   |  mov LFUNC:RB, LFUNC:RB->tab
@@ -1563,7 +1571,9 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.ffunc_1 next
   |  je >2				// Missing 2nd arg?
+  |1:
 #if LJ_COLONY
+  |  checklangjs >5
   |  cmp dword [BASE+4], LJ_TFUNC;  jne >5
   |  mov LFUNC:RB, [BASE]
   |  mov LFUNC:RB, LFUNC:RB->tab
@@ -2744,6 +2754,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  jmp ->fff_resbit
   |.ffunc_bit_sh bit_rshift, shr
 #if LJ_COLONY
+  |  checklangjs ->fff_resbit
   |  jmp ->fff_resbitu
 #else
   |  jmp ->fff_resbit
@@ -3176,14 +3187,15 @@ static void build_subroutines(BuildCtx *ctx)
   |  andpd xmm4, xmm2			// |x/y|
   |  ucomisd xmm3, xmm4			// No truncation if 2^52 <= |x/y|.
   |  jbe >1
+  |  andnpd xmm2, xmm0			// Isolate sign bit.
   |  addsd xmm4, xmm3			// (|x/y| + 2^52) - 2^52
   |  subsd xmm4, xmm3
-  |  andnpd xmm2, xmm0      // Isolate sign bit.
   |  orpd xmm4, xmm2			// Merge sign bit back in.
 #if LJ_COLONY
   |  movaps xmm3, xmm4
   |  xorpd xmm3, xmm2      // |x/y|
   |  xorpd xmm0, xmm2      // |result|
+  |3:
   |  sseconst_1 xmm2, RDa
   |  cmpsd xmm0, xmm3, 1    // x/y < result?
 #else
@@ -4301,6 +4313,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_AD	// RA = dst or unused, RD = src, JMP with RD = target
     |  add PC, 4
 #if LJ_COLONY
+    |  checklangjs >3
     |  checkstr RD, >1
     |  mov STR:RB, [BASE+RD*8]
     |  mov RB, dword STR:RB->len
@@ -4361,6 +4374,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_AD	// RA = dst, RD = src
     |  xor RB, RB
 #if LJ_COLONY
+    |  checklangjs >4
     |  checkstr RD, >2
     |  mov STR:RD, [BASE+RD*8]
     |  mov RD, dword STR:RD->len
@@ -5155,6 +5169,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  checkstr RC, ->vmeta_tsetv
     |  mov STR:RC, [BASE+RC*8]
 #if LJ_COLONY
+    |  checklangjs ->BC_TSETS_Z
     |  // check length
     |  cmp dword [STR:RC+offsetof(struct GCstr, len)], 0
     |  je ->BC_TSETS_Z // zero length

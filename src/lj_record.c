@@ -1832,19 +1832,27 @@ void lj_record_ins(jit_State *J)
 
   case BC_NOT:
     /* Type specialization already forces const result. */
-    if (!tref_istruecond(rc))
-      rc = TREF_TRUE;
-    else if (tref_isstr(rc)) {
-      uint32_t len = strV(rcv)->len;
-      rc = emitir(IRTI(IR_FLOAD), rc, IRFL_STR_LEN);
-      emitir(IRTG(len > 0 ? IR_GT : IR_EQ, tref_type(rc)), rc, tref_type(rc) == IRT_INT ? lj_ir_kint(J, 0) : lj_ir_knum(J, 0));
-      rc = len > 0 ? TREF_FALSE : TREF_TRUE;
-    } else if (tref_isnum(rc) || tref_isint(rc)) {
-      lua_Number len = numberVnum(rcv) > 0;
-      emitir(IRTG(len > 0 ? IR_GT : IR_EQ, tref_type(rc)), rc, tref_type(rc) == IRT_INT ? lj_ir_kint(J, 0) : lj_ir_knum(J, 0));
-      rc = len > 0 ? TREF_FALSE : TREF_TRUE;
-    } else
-      rc = TREF_FALSE;
+#if LJ_COLONY
+    if (J2G(J)->lang == LANG_JS) {
+      if (!tref_istruecond(rc))
+        rc = TREF_TRUE;
+      else if (tref_isstr(rc)) {
+        uint32_t len = strV(rcv)->len;
+        rc = emitir(IRTI(IR_FLOAD), rc, IRFL_STR_LEN);
+        emitir(IRTG(len > 0 ? IR_GT : IR_EQ, tref_type(rc)), rc, tref_type(rc) == IRT_INT ? lj_ir_kint(J, 0) : lj_ir_knum(J, 0));
+        rc = len > 0 ? TREF_FALSE : TREF_TRUE;
+      } else if (tref_isnum(rc) || tref_isint(rc)) {
+        lua_Number len = numberVnum(rcv) > 0;
+        emitir(IRTG(len > 0 ? IR_GT : IR_EQ, tref_type(rc)), rc, tref_type(rc) == IRT_INT ? lj_ir_kint(J, 0) : lj_ir_knum(J, 0));
+        rc = len > 0 ? TREF_FALSE : TREF_TRUE;
+      } else
+        rc = TREF_FALSE;
+    } else {
+      rc = tref_istruecond(rc) ? TREF_FALSE : TREF_TRUE;
+    }
+#else
+    rc = tref_istruecond(rc) ? TREF_FALSE : TREF_TRUE;
+#endif
     break;
 
   case BC_LEN:
