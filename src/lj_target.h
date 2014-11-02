@@ -138,6 +138,8 @@ typedef uint32_t RegCost;
 #include "lj_target_x86.h"
 #elif LJ_TARGET_ARM
 #include "lj_target_arm.h"
+#elif LJ_TARGET_THUMB
+#include "lj_target_thumb.h"
 #elif LJ_TARGET_PPC
 #include "lj_target_ppc.h"
 #elif LJ_TARGET_MIPS
