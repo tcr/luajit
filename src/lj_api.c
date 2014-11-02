@@ -761,26 +761,36 @@ LUA_API void lua_getfield(lua_State *L, int idx, const char *k)
 LUA_API void lua_rawget(lua_State *L, int idx)
 {
   cTValue *t = index2adr(L, idx);
+#if LJ_COLONY
   GCtab* tab;
-  if (tvisfunc(t)) {
+  if (G(L)->lang == LANG_JS && tvisfunc(t)) {
     tab = tabref(funcV(t)->c.tab);
   } else {
     api_check(L, tvistab(t));
     tab = tabV(t);
   }
+#else
+  api_check(L, tvistab(t));
+  copyTV(L, L->top-1, lj_tab_get(L, tabV(t), L->top-1));
+#endif
   copyTV(L, L->top-1, lj_tab_get(L, tab, L->top-1));
 }
 
 LUA_API void lua_rawgeti(lua_State *L, int idx, int n)
 {
   cTValue *v, *t = index2adr(L, idx);
+#if LJ_COLONY
   GCtab* tab;
-  if (tvisfunc(t)) {
+  if (G(L)->lang == LANG_JS && tvisfunc(t)) {
     tab = tabref(funcV(t)->c.tab);
   } else {
     api_check(L, tvistab(t));
     tab = tabV(t);
   }
+#else
+  api_check(L, tvistab(t));
+  tab = tabV(t);
+#endif
   v = lj_tab_getint(tab, n);
   if (v) {
     copyTV(L, L->top, v);
@@ -938,13 +948,17 @@ LUA_API void lua_setfield(lua_State *L, int idx, const char *k)
 
 LUA_API void lua_rawset(lua_State *L, int idx)
 {
+#if LJ_COLONY
   GCtab* t;
   cTValue* v = index2adr(L, idx);
-  if (tvisfunc(v)) {
+  if (G(L)->lang == LANG_JS && tvisfunc(v)) {
     t = tabref(funcV(v)->c.tab);
   } else {
     t = tabV(v);
   }
+#else
+  GCtab *t = tabV(index2adr(L, idx));
+#endif
   TValue *dst, *key;
   api_checknelems(L, 2);
   key = L->top-2;
@@ -956,13 +970,17 @@ LUA_API void lua_rawset(lua_State *L, int idx)
 
 LUA_API void lua_rawseti(lua_State *L, int idx, int n)
 {
+#if LJ_COLONY
   GCtab *t;
   cTValue* v = index2adr(L, idx);
-  if (tvisfunc(v)) {
+  if (G(L)->lang == LANG_JS && tvisfunc(v)) {
     t = tabref(funcV(v)->c.tab);
   } else {
     t = tabV(v);
   }
+#else
+  GCtab *t = tabV(index2adr(L, idx));
+#endif
   TValue *dst, *src;
   api_checknelems(L, 1);
   dst = lj_tab_setint(L, t, n);
