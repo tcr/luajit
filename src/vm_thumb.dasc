@@ -2039,14 +2039,19 @@ static void build_subroutines(BuildCtx *ctx)
   |  blne ->vm_tobit_fb
   |  ins CARG1, CARG1, RA
   |  mvn CARG2, #~LJ_TISNUM
-  |  b ->fff_restv
   |.endmacro
   |
   |.ffunc_bit_sh lshift, lsl, 0
+  |  b ->fff_restv
   |.ffunc_bit_sh rshift, lsr, 0
+  |  bl extern __aeabi_ui2d
+  |  b ->fff_restv
   |.ffunc_bit_sh arshift, asr, 0
+  |  b ->fff_restv
   |.ffunc_bit_sh rol, ror, 1
+  |  b ->fff_restv
   |.ffunc_bit_sh ror, ror, 0
+  |  b ->fff_restv
   |
   |//-----------------------------------------------------------------------
   |
