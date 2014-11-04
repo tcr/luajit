@@ -1969,8 +1969,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  rsb RB, RB, #20
   |  lsl CARG1, CARG2, #12
   |   cmp CARG2, #0
-  |  lsl CARG3, CARG1, RB
-  |  orr CARG1, CARG4, CARG3
+  |  lsl CARG1, CARG1, RB
+  |  orr CARG1, CARG4, CARG1
   |   rsblt CARG1, CARG1, #0
   |  bx lr
   |
@@ -2339,6 +2339,7 @@ static void build_subroutines(BuildCtx *ctx)
   |   bicpl CARG4, CARG2, CARG4	// |x| <= 2^20: ztest |= hi & ~himask
   |   orrpl CARG3, CARG3, CARG4
   |   mvnpl CARG4, #1
+  |  itt pl
   |   lslpl CARG4, CARG4, RB
   |  andpl CARG2, CARG2, CARG4	// |x| <= 2^20: hi &= himask
   |.if "func" == "floor"
