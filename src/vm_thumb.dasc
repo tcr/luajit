@@ -2463,9 +2463,11 @@ static void build_subroutines(BuildCtx *ctx)
   |  eor CARG2, CARG2, #0x80000000
   |  bl extern __aeabi_dadd
 #if LJ_COLONY
-  |  ldrd CARG3, CARG4, [sp, #8]
-  |  cmp CARG4, #0
-  |  blpl extern __aeabi_dsub
+  |  ldr CARG3, [sp, #4]
+  |  ldr CARG4, [sp, #12]
+  |  eors CARG3, CARG3, CARG4
+  |  ldr CARG3, [sp, #8]
+  |  blmi extern __aeabi_dsub
 #endif
   |  add sp, sp, #20
   |  pop {pc}
@@ -2475,7 +2477,11 @@ static void build_subroutines(BuildCtx *ctx)
   |->vm_modi:
   |  ands RB, CARG1, #0x80000000
   |  rsbmi CARG1, CARG1, #0		// a = |dividend|
-  |  eor RB, RB, CARG2, asr #1		// Keep signdiff and sign(divisor).
+#if LJ_COLONY
+  |  eor RB, RB, CARG2		// Keep signdiff.
+#else
+  |  eor RB, RB, CARG2, asr #1    // Keep signdiff and sign(divisor).
+#endif
   |  cmp CARG2, #0
   |  rsbmi CARG2, CARG2, #0		// b = |divisor|
   |  subs CARG4, CARG2, #1
@@ -2499,15 +2505,16 @@ static void build_subroutines(BuildCtx *ctx)
     }
   }
   |1:
-#if !LJ_COLONY
+#if LJ_COLONY
   |  cmp CARG1, #0
   |  cmpne RB, #0
-  |  submi CARG1, CARG1, CARG2		// if (y != 0 && signdiff) y = y - b
-  |  eors CARG2, CARG1, RB, lsl #1
-  |  rsbmi CARG1, CARG1, #0		// if (sign(divisor) != sign(y)) y = -y
+  |  rsbmi CARG1, CARG1, #0   // if (sign(divisor) != sign(dividend)) y = -y
 #else
-  |  cmp RB, #0
-  |  rsbhi CARG1, CARG1, #0		// if (sign(divisor) != sign(y)) y = -y
+  |  cmp CARG1, #0
+  |  cmpne RB, #0
+  |  submi CARG1, CARG1, CARG2    // if (y != 0 && signdiff) y = y - b
+  |  eors CARG2, CARG1, RB, lsl #1
+  |  rsbmi CARG1, CARG1, #0   // if (sign(divisor) != sign(y)) y = -y
 #endif
   |  bx lr
   |
@@ -2960,8 +2967,20 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   bhi >5
     |  checktp CARG2, LJ_TISNUM
     |   beq >4
-    |  orr CARG3, CARG3, CARG2
-    |  cmp CARG3, #2
+    // float
+    // bias == all 1's and something nonzero
+    // zero = all 0's
+    |  // add double to itself
+    |  adds  CARG1, CARG1, CARG1
+    |  adc   CARG2, CARG2, CARG2
+    |  // subtract 1
+    |  mvn   CARG3, #1
+    |  adds  CARG1, CARG1, CARG3
+    |  adc   CARG2, CARG2, CARG3
+    |  // compare with nan << 1
+    |  mvn   CARG4, #0x200000
+    |  cmp   CARG1, CARG3
+    |  sbcs  CARG3, CARG2, CARG4
     |  b >3
     |4:
     |  mvn CARG3, CARG1
