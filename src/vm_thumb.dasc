@@ -2951,8 +2951,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   bhi >5
     |  checktp CARG2, LJ_TISNUM
     |   beq >4
-    |  mvn CARG3, CARG2
-    |  cmn CARG3, #2
+    |  orr CARG3, CARG3, CARG2
+    |  cmp CARG3, #2
     |  b >3
     |4:
     |  mvn CARG3, CARG1
