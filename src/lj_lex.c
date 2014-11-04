@@ -79,8 +79,10 @@ static void inclinenumber(LexState *ls)
   next(ls);  /* skip `\n' or `\r' */
   if (currIsNewline(ls) && ls->current != old)
     next(ls);  /* skip `\n\r' or `\r\n' */
+#if !LJ_COLONY
   if (++ls->linenumber >= LJ_MAX_LINE)
     lj_lex_error(ls, ls->token, LJ_ERR_XLINES);
+#endif
 }
 
 /* -- Scanner for terminals ----------------------------------------------- */
@@ -146,6 +148,47 @@ static int skip_sep(LexState *ls)
   }
   return (ls->current == s) ? count : (-count) - 1;
 }
+
+#if LJ_COLONY
+
+static int32_t read_comment_line(LexState *ls, int sep)
+{
+  TValue ret;
+  save_and_next(ls);  /* skip 2nd `[' */
+  if (currIsNewline(ls))  /* string starts with a newline? */
+    inclinenumber(ls);  /* skip it */
+  for (;;) {
+    switch (ls->current) {
+    case END_OF_STREAM:
+      lj_lex_error(ls, TK_eof, LJ_ERR_XLCOM);
+      break;
+    case ']':
+      if (skip_sep(ls) == sep) {
+        next(ls);  /* skip 2nd `]' */
+        goto endloop;
+      }
+      break;
+    case '\n':
+    case '\r':
+      save(ls, '\n');
+      inclinenumber(ls);
+      lj_str_resetbuf(&ls->sb);  /* avoid wasting space */
+      break;
+    default:
+      save_and_next(ls);
+      break;
+    }
+  } endloop:
+  ls->sb.buf[ls->sb.n - 1] = '\0';
+  const uint8_t *buf = ((const uint8_t *)ls->sb.buf) + 1 + (MSize)sep;
+  if (lj_strscan_scan(buf, &ret, STRSCAN_OPT_TOINT) == STRSCAN_INT) {
+    ls->linenumber = intV(&ret);
+    return ls->linenumber;
+  }
+  return -1;
+}
+
+#endif
 
 static void read_long_string(LexState *ls, TValue *tv, int sep)
 {
@@ -297,7 +340,11 @@ static int llex(LexState *ls, TValue *tv)
 	int sep = skip_sep(ls);
 	lj_str_resetbuf(&ls->sb);  /* `skip_sep' may dirty the buffer */
 	if (sep >= 0) {
-	  read_long_string(ls, NULL, sep);  /* long comment */
+#if LJ_COLONY
+	  read_comment_line(ls, sep);  /* long comment */
+#else
+          read_long_string(ls, NULL, sep);  /* long comment */
+#endif
 	  lj_str_resetbuf(&ls->sb);
 	  continue;
 	}
