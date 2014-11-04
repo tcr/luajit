@@ -2463,6 +2463,11 @@ static void build_subroutines(BuildCtx *ctx)
   |  ldrd CARG3, CARG4, [sp]
   |  eor CARG2, CARG2, #0x80000000
   |  bl extern __aeabi_dadd
+#if LJ_COLONY
+  |  ldrd CARG3, CARG4, [sp, #8]
+  |  cmp CARG4, #0
+  |  blpl extern __aeabi_dsub
+#endif
   |  add sp, sp, #20
   |  pop {pc}
   |.endif
@@ -2495,11 +2500,16 @@ static void build_subroutines(BuildCtx *ctx)
     }
   }
   |1:
+#if !LJ_COLONY
   |  cmp CARG1, #0
   |  cmpne RB, #0
   |  submi CARG1, CARG1, CARG2		// if (y != 0 && signdiff) y = y - b
   |  eors CARG2, CARG1, RB, lsl #1
   |  rsbmi CARG1, CARG1, #0		// if (sign(divisor) != sign(y)) y = -y
+#else
+  |  cmp RB, #0
+  |  rsbhi CARG1, CARG1, #0		// if (sign(divisor) != sign(y)) y = -y
+#endif
   |  bx lr
   |
   |//-----------------------------------------------------------------------
