@@ -934,8 +934,9 @@ static void bcemit_unop(FuncState *fs, BCOp op, ExpDesc *e)
       return;
     } else if (expr_isk(e) || (LJ_HASFFI && e->k == VKCDATA)) {
 #if LJ_COLONY
-      e->k = (e->k == VKNUM && numV(&e->u.nval) == 0) ||
-        (e->k == VKSTR && e->u.sval->len == 0) ? VKTRUE : VKFALSE;
+      e->k = e->k == VKNUM ? (numberVnum(&e->u.nval) == 0 ? VKTRUE : VKFALSE)
+        : e->k == VKSTR ? (e->u.sval->len == 0 ? VKTRUE : VKFALSE)
+        : VKFALSE;
 #else
       e->k = VKFALSE;
 #endif
