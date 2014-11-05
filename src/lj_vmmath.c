@@ -30,7 +30,11 @@ double lj_vm_foldarith(double x, double y, int op)
   case IR_SUB - IR_ADD: return x-y; break;
   case IR_MUL - IR_ADD: return x*y; break;
   case IR_DIV - IR_ADD: return x/y; break;
+#if LJ_COLONY
+  case IR_MOD - IR_ADD: return x-lj_vm_floor(x/y)*y + (x < 0 ? -y : 0); break;
+#else
   case IR_MOD - IR_ADD: return x-lj_vm_floor(x/y)*y; break;
+#endif
   case IR_POW - IR_ADD: return pow(x, y); break;
   case IR_NEG - IR_ADD: return -x; break;
   case IR_ABS - IR_ADD: return fabs(x); break;
