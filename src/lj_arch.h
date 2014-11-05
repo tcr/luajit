@@ -206,7 +206,6 @@
 #define LJ_ABI_EABI		1
 #define LJ_TARGET_THUMB		1
 #define LJ_TARGET_EHRETREG	0
-#define LJ_TARGET_JUMPRANGE	25	/* +-2^25 = +-32MB */
 #define LJ_TARGET_MASKSHIFT	0
 #define LJ_TARGET_MASKROT	1
 #define LJ_TARGET_UNIFYROT	2	/* Want only IR_BROR. */
@@ -451,7 +450,7 @@
 #endif
 
 /* Compatibility with Lua 5.1 vs. 5.2. */
-#if defined(LUAJIT_ENABLE_LUA52COMPAT)
+#ifdef LUAJIT_ENABLE_LUA52COMPAT
 #define LJ_52			1
 #else
 #define LJ_52			0

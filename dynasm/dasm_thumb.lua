@@ -290,7 +290,7 @@ local map_op = {
   -- ["b_1"] = "B:1101cccciiiiiiii|B:11100iiiiiiiiiii",
   ["b.w_1"] = "sB:11110scccciiiiii10j0kiiiiiiiiiii|sB:11110siiiiiiiiii10j1kiiiiiiiiiii",
   ["bfc_3"] = "dim:11110011011011110iiiddddii0mmmmm",
-  ["bfi_4"] = "dnim:111100110110nnnn0iiiddddii0mmmmm",
+  ["bfi_4"] = "dnij:111100110110nnnn0iiiddddii0jjjjj",
   ["bic.w_3"] = "sdni:11110H00001snnnn0HHHddddHHHHHHHH|sdnmT:11101010001snnnn0iiiddddiiTTmmmm",
   ["bic.w_4"] = "sdnmT:11101010001snnnn0iiiddddiiTTmmmm",
   ["bic_2"] = "sdm:0100001110mmmddd",
@@ -321,7 +321,7 @@ local map_op = {
   ["ldr.w_3"] = "tL:111110000101nnnntttt1PUWiiiiiiii",
   ["ldrb_2"] = "tL:01111iiiiinnnttt|tL:0101110mmmnnnttt",
   ["ldrb.w_3"] = "tL:111110000001nnnntttt1PUWiiiiiiii|tL:111110000001nnnntttt000000iimmmm",
-  ["ldrb.w_2"] = "tL:111110000001nnnntttt1PUWiiiiiiii|tL:111110000001nnnntttt000000iimmmm|tL:111110001001nnnnttttiiiiiiiiiiii|tB:11111000u0011111ttttiiiiiiiiiiii",
+  ["ldrb.w_2"] = "tL:111110001001nnnnttttiiiiiiiiiiii|tL:111110000001nnnntttt1PUWiiiiiiii|tL:111110000001nnnntttt000000iimmmm|tB:11111000u0011111ttttiiiiiiiiiiii",
   ["ldrbt_2"] = "tL:111110000001nnnntttt1110iiiiiiii",
   ["ldrex_2"] = "tL:111010000101nnnntttt1111ffffffff",
   ["ldrexb_2"] = "tL:111010001101nnnntttt111101001111",
@@ -390,7 +390,7 @@ local map_op = {
   ["sbc.w_3"] = "sdni:11110H01011snnnn0HHHddddHHHHHHHH|sdnmT:11101011011snnnn0iiiddddiiTTmmmm",
   ["sbc.w_4"] = "sdnmT:11101011011snnnn0iiiddddiiTTmmmm",
   ["sbc_2"] = "sdm:0100000110mmmddd",
-  ["sbfx_4"] = "sdniw:111100110100nnnn0iiiddddii0wwwww",
+  ["sbfx_4"] = "dniJ:111100110100nnnn0iiiddddii0JJJJJ",
   ["sdiv_3"] = "dnm:111110111001nnnn1111dddd1111mmmm",
   ["sel_3"] = "dnm:111110101010nnnn1111dddd1000mmmm",
   ["smlal_4"] = "lhnm:111110111100nnnnllllhhhh0000mmmm",
@@ -409,7 +409,8 @@ local map_op = {
   ["strd_3"] = "tdL:1110100PU1W0nnnnttttddddffffffff",
   ["strd_4"] = "tdL:1110100PU1W0nnnnttttddddffffffff",
   ["strh_3"] = "tL:10000iiiiinnnttt|tL:0101001mmmnnnttt",
-  ["strh.w_3"] = "tL:111110001010nnnnttttiiiiiiiiiiii|tL:111110000010nnnntttt1PUWiiiiiiii",
+  ["strh.w_2"] = "tL:111110001010nnnnttttiiiiiiiiiiii|tL:111110000010nnnntttt1PUWiiiiiiii|tL:111110000010nnnntttt000000iimmmm",
+  ["strh.w_3"] = "tL:111110000010nnnntttt1PUWiiiiiiii",
   ["strht_3"] = "tL:111110000010nnnntttt1110iiiiiiii",
   ["strt_3"] = "tL:111110000100nnnntttt1110iiiiiiii",
   ["sub_3"] = "sdni:0001111iiinnnddd|sdnm:0001101mmmnnnddd",
@@ -664,7 +665,7 @@ local function parse_imm(imm, bits, shift, scale, puw, instrlen)
     if scale > 3 then werror('IMM scale too big: ' .. scale) end
 
     -- TODO why this
-    if imm ~= 'GG_DISP2STATIC' then
+    if imm ~= 'GG_DISP2STATIC' and (match(imm, 'DISPATCH_J') == nil or bits < 8) then
       if not puw or puw == 0 then werror('IMM must be signed') end
     end
     waction("IMM", shl(puw == 7 and 2 or (puw == 9 and 1 or 0), 10) + shl(bits, 5) + shl(shift, 1) + (scale == 2 and 1 or 0), imm)
@@ -814,16 +815,24 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
     end
 
     -- Immediate values
-    if p == 'i' then
+    if p == 'i' or p == 'j' or p == 'J' then
       local imm = match(params[n], "^#(.*)$")
       if not imm then
         werror('bad immediate (i) operand')
       end
 
-      if bits['i'] then
-        values[p] = parse_imm(imm, bits['i'], shifts['i'], 0, 0, instrlen)
+      if bits[p] then
+        values[p] = parse_imm(imm, bits[p], shifts[p], 0, 0, instrlen)
         if values[p] >= (2 ^ bits[p]) then
           werror('immediate operand larger than ' .. bits[p] .. ' bits')
+        end
+
+        if p == 'j' then
+          values[p] = values['i'] + values[p] - 1
+        end
+
+        if p == 'J' then
+          values[p] = values[p] - 1
         end
 
       elseif bits['f'] then

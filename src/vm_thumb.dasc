@@ -1969,7 +1969,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  rsb RB, RB, #20
   |  lsl CARG1, CARG2, #12
   |   cmp CARG2, #0
-  |  orr CARG1, CARG4, CARG1, lsl RB
+  |  lsl CARG1, CARG1, RB
+  |  orr CARG1, CARG4, CARG1
   |   rsblt CARG1, CARG1, #0
   |  bx lr
   |
@@ -2039,14 +2040,19 @@ static void build_subroutines(BuildCtx *ctx)
   |  blne ->vm_tobit_fb
   |  ins CARG1, CARG1, RA
   |  mvn CARG2, #~LJ_TISNUM
-  |  b ->fff_restv
   |.endmacro
   |
   |.ffunc_bit_sh lshift, lsl, 0
+  |  b ->fff_restv
   |.ffunc_bit_sh rshift, lsr, 0
+  |  bl extern __aeabi_ui2d
+  |  b ->fff_restv
   |.ffunc_bit_sh arshift, asr, 0
+  |  b ->fff_restv
   |.ffunc_bit_sh rol, ror, 1
+  |  b ->fff_restv
   |.ffunc_bit_sh ror, ror, 0
+  |  b ->fff_restv
   |
   |//-----------------------------------------------------------------------
   |
@@ -2175,7 +2181,7 @@ static void build_subroutines(BuildCtx *ctx)
   |->vm_hotloop:			// Hot loop counter underflow.
   |.if JIT
   |  ldr LFUNC:CARG3, [BASE, FRAME_FUNC]  // Same as curr_topL(L).
-  |   sub CARG1, DISPATCH, #-GG_DISP2J
+  |   add CARG1, DISPATCH, #GG_DISP2J
   |   str PC, SAVE_PC
   |  ldr CARG3, LFUNC:CARG3->field_pc
   |   mov CARG2, PC
@@ -2225,21 +2231,31 @@ static void build_subroutines(BuildCtx *ctx)
   |.if JIT
   |  sub sp, sp, #12
   |  push {r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12}
+  // CARG1 = exit instruction pc
   |  ldr CARG1, [sp, #64]	// Load original value of lr.
-  |   ldr DISPATCH, [lr]	// Load DISPATCH.
+  |   ldr DISPATCH, [lr, #-1]	// Load DISPATCH.
   |    add CARG3, sp, #64	// Recompute original value of sp.
   |   mv_vmstate CARG4, EXIT
   |    str CARG3, [sp, #52]	// Store sp in RID_SP
   |   st_vmstate CARG4
-  |  ldr CARG2, [CARG1, #-4]!	// Get exit instruction.
+  // CARG2 = exit branch ins
+  |  ldr CARG4, [CARG1, #-5]!	// Get exit instruction.
   |   str CARG1, [sp, #56]	// Store exit pc in RID_LR and RID_PC.
   |   str CARG1, [sp, #60]
   |.if FPU
   |  vpush {d0-d15}
   |.endif
-  |  lsl CARG2, CARG2, #8
-  |  add CARG1, CARG1, CARG2, asr #6
-  |   ldr CARG2, [lr, #4]	// Load exit stub group offset.
+  // CARG2 = branch ins << 2
+  //|  lsl CARG2, CARG2, #8
+  |  sbfx CARG2, CARG4, #10, #1
+  |  bfi CARG2, CARG4, #11, #10
+  |  lsr CARG4, CARG4, #16
+  |  bfi CARG2, CARG4, #0, #11
+  // CARG1 = exit instruction pc + branch
+  //  add CARG1, CARG1, CARG2, asr #2
+  |  add CARG1, CARG1, CARG2, lsl #1
+  |   ldr CARG2, [lr, #+7]	// Load exit stub group offset.
+  // CARG1 = exit instruction pc + branch - lr
   |   sub CARG1, CARG1, lr
   |  ldr L, [DISPATCH, #DISPATCH_GL(jit_L)]
   |   add CARG1, CARG2, CARG1, lsr #2	// Compute exit number.
@@ -2249,7 +2265,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  str L, [DISPATCH, #DISPATCH_J(L)]
   |    str BASE, L->base
   |   str CARG4, [DISPATCH, #DISPATCH_GL(jit_L)]
-  |  sub CARG1, DISPATCH, #-GG_DISP2J
+  |  add CARG1, DISPATCH, #GG_DISP2J
   |  mov CARG2, sp
   |  bl extern lj_trace_exit		// (jit_State *J, ExitState *ex)
   |  // Returns MULTRES (unscaled) or negated error code.
@@ -2314,13 +2330,18 @@ static void build_subroutines(BuildCtx *ctx)
   |  subs RB, CARG4, RB, asr #21	// 2^0: RB = 51, 2^51: RB = 0.
   |  bxlo lr				// |x| >= 2^52: done.
   |  mvn CARG4, #1
-  |   bic CARG3, CARG1, CARG4, lsl RB	// ztest = lo & ~lomask
-  |  and CARG1, CARG1, CARG4, lsl RB	// lo &= lomask
+  |  lsl CARG4, CARG4, RB
+  |   bic CARG3, CARG1, CARG4	// ztest = lo & ~lomask
+  |  and CARG1, CARG1, CARG4	// lo &= lomask
   |  subs RB, RB, #32
-  |   bicpl CARG4, CARG2, CARG4, lsl RB	// |x| <= 2^20: ztest |= hi & ~himask
+  |  mvn CARG4, #1
+  |  lsl CARG4, CARG4, RB
+  |   bicpl CARG4, CARG2, CARG4	// |x| <= 2^20: ztest |= hi & ~himask
   |   orrpl CARG3, CARG3, CARG4
   |   mvnpl CARG4, #1
-  |  andpl CARG2, CARG2, CARG4, lsl RB	// |x| <= 2^20: hi &= himask
+  |  itt pl
+  |   lslpl CARG4, CARG4, RB
+  |  andpl CARG2, CARG2, CARG4	// |x| <= 2^20: hi &= himask
   |.if "func" == "floor"
   |   tst CARG3, CARG2, asr #31		// iszero = ((ztest & signmask) == 0)
   |.else
@@ -2335,7 +2356,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  lslpl CARG3, CARG4, RB
   |  mvnmi CARG3, #0
   |  add RB, RB, #32
-  |  subs CARG1, CARG1, CARG4, lsl RB	// lo = lo-lomask
+  |  lsl CARG4, CARG4, RB
+  |  subs CARG1, CARG1, CARG4	// lo = lo-lomask
   |  sbc CARG2, CARG2, CARG3		// hi = hi-himask+carry
   |.if hf == 1
   |  vmov d0, CARG1, CARG2
@@ -2352,12 +2374,16 @@ static void build_subroutines(BuildCtx *ctx)
   |.endif
   |  mov CARG1, #0			// lo = 0
   |  and CARG2, CARG2, #0x80000000
-  |  ldrne CARG4, <9			// hi = sign(x) | (iszero ? 0.0 : 1.0)
+  |  ldrne CARG4, >9			// hi = sign(x) | (iszero ? 0.0 : 1.0)
   |  orrne CARG2, CARG2, CARG4
   |.if hf == 1
   |  vmov d0, CARG1, CARG2
   |.endif
   |  bx lr
+  |
+  |.align 8
+  |9:
+  |  .long 0x00000000, 0x41e00000 // 2^31.
   |.endmacro
   |
   |9:
@@ -2394,9 +2420,12 @@ static void build_subroutines(BuildCtx *ctx)
   |  subs RB, CARG4, RB, asr #21	// 2^0: RB = 51, 2^51: RB = 0.
   |  bxlo lr				// |x| >= 2^52: already done.
   |  mvn CARG4, #1
-  |  and CARG1, CARG1, CARG4, lsl RB	// lo &= lomask
+  |  lsl CARG4, CARG4, RB
+  |  and CARG1, CARG1, CARG4	// lo &= lomask
   |  subs RB, RB, #32
-  |  andpl CARG2, CARG2, CARG4, lsl RB	// |x| <= 2^20: hi &= himask
+  |  mvn CARG4, #1
+  |  lsl CARG4, CARG4, RB
+  |  andpl CARG2, CARG2, CARG4	// |x| <= 2^20: hi &= himask
   |.if hf == 1
   |  vmov d0, CARG1, CARG2
   |.endif
@@ -2433,6 +2462,13 @@ static void build_subroutines(BuildCtx *ctx)
   |  ldrd CARG3, CARG4, [sp]
   |  eor CARG2, CARG2, #0x80000000
   |  bl extern __aeabi_dadd
+#if LJ_COLONY
+  |  ldr CARG3, [sp, #4]
+  |  ldr CARG4, [sp, #12]
+  |  eors CARG3, CARG3, CARG4
+  |  ldr CARG3, [sp, #8]
+  |  blmi extern __aeabi_dsub
+#endif
   |  add sp, sp, #20
   |  pop {pc}
   |.endif
@@ -2441,7 +2477,11 @@ static void build_subroutines(BuildCtx *ctx)
   |->vm_modi:
   |  ands RB, CARG1, #0x80000000
   |  rsbmi CARG1, CARG1, #0		// a = |dividend|
-  |  eor RB, RB, CARG2, asr #1		// Keep signdiff and sign(divisor).
+#if LJ_COLONY
+  |  eor RB, RB, CARG2		// Keep signdiff.
+#else
+  |  eor RB, RB, CARG2, asr #1    // Keep signdiff and sign(divisor).
+#endif
   |  cmp CARG2, #0
   |  rsbmi CARG2, CARG2, #0		// b = |divisor|
   |  subs CARG4, CARG2, #1
@@ -2465,11 +2505,17 @@ static void build_subroutines(BuildCtx *ctx)
     }
   }
   |1:
+#if LJ_COLONY
   |  cmp CARG1, #0
   |  cmpne RB, #0
-  |  submi CARG1, CARG1, CARG2		// if (y != 0 && signdiff) y = y - b
+  |  rsbmi CARG1, CARG1, #0   // if (sign(divisor) != sign(dividend)) y = -y
+#else
+  |  cmp CARG1, #0
+  |  cmpne RB, #0
+  |  submi CARG1, CARG1, CARG2    // if (y != 0 && signdiff) y = y - b
   |  eors CARG2, CARG1, RB, lsl #1
-  |  rsbmi CARG1, CARG1, #0		// if (sign(divisor) != sign(y)) y = -y
+  |  rsbmi CARG1, CARG1, #0   // if (sign(divisor) != sign(y)) y = -y
+#endif
   |  bx lr
   |
   |//-----------------------------------------------------------------------
@@ -2921,8 +2967,21 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   bhi >5
     |  checktp CARG2, LJ_TISNUM
     |   beq >4
-    |  mvn CARG3, CARG2
-    |  cmn CARG3, #2
+    // float
+    // bias == all 1's and something nonzero
+    // zero = all 0's
+    |  // add double to itself
+    |  adds  CARG1, CARG1, CARG1
+    |  adc   CARG2, CARG2, CARG2
+    |  // subtract 1
+    |  mvn   CARG3, #1
+    |  adds  CARG1, CARG1, CARG3
+    |  adc   CARG2, CARG2, CARG3
+    |  // compare with nan << 1
+    |  mvn   CARG4, #0x200000
+    |  cmp   CARG1, CARG3
+    |  sbcs  CARG3, CARG2, CARG4
+    |  ldrd CARG1, CARG2, [RC]
     |  b >3
     |4:
     |  mvn CARG3, CARG1
@@ -4560,6 +4619,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ldr TRACE:RC, [CARG1, RC, lsl #2]
     |   st_vmstate CARG2
     |  ldr RA, TRACE:RC->mcode
+    |  add RA, RA, #1
     |   str BASE, [DISPATCH, #DISPATCH_GL(jit_base)]
     |   str L, [DISPATCH, #DISPATCH_GL(jit_L)]
     |  bx RA
