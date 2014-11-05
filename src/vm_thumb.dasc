@@ -2981,6 +2981,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  mvn   CARG4, #0x200000
     |  cmp   CARG1, CARG3
     |  sbcs  CARG3, CARG2, CARG4
+    |  ldrd CARG1, CARG2, [RC]
     |  b >3
     |4:
     |  mvn CARG3, CARG1
