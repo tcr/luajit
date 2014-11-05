@@ -72,6 +72,12 @@ static LJ_AINLINE void save(LexState *ls, int c)
     ls->sb.buf[ls->sb.n++] = (char)c;
 }
 
+#if LJ_COLONY
+
+int use_colony_lines = 0;
+
+#endif
+
 static void inclinenumber(LexState *ls)
 {
   int old = ls->current;
@@ -79,10 +85,11 @@ static void inclinenumber(LexState *ls)
   next(ls);  /* skip `\n' or `\r' */
   if (currIsNewline(ls) && ls->current != old)
     next(ls);  /* skip `\n\r' or `\r\n' */
-#if !LJ_COLONY
+#if LJ_COLONY
+  if (!use_colony_lines)
+#endif
   if (++ls->linenumber >= LJ_MAX_LINE)
     lj_lex_error(ls, ls->token, LJ_ERR_XLINES);
-#endif
 }
 
 /* -- Scanner for terminals ----------------------------------------------- */
@@ -182,6 +189,7 @@ static int32_t read_comment_line(LexState *ls, int sep)
   ls->sb.buf[ls->sb.n - 1] = '\0';
   const uint8_t *buf = ((const uint8_t *)ls->sb.buf) + 1 + (MSize)sep;
   if (lj_strscan_scan(buf, &ret, STRSCAN_OPT_TOINT) == STRSCAN_INT) {
+    use_colony_lines = 1;
     ls->linenumber = intV(&ret);
     return ls->linenumber;
   }
