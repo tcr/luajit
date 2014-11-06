@@ -226,7 +226,7 @@ GCtab *lj_lib_checktab(lua_State *L, int narg)
     if (o < L->top) {
       if (tvistab(o))
         return tabV(o);
-      else if (tvisfunc(o))
+      else if (tvisfunc(o) && tabref(funcV(o)->c.tab))
         return tabref(funcV(o)->c.tab);
     }
     lj_err_arg(L, narg, LJ_ERR_NOTABN);

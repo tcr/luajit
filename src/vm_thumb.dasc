@@ -1081,7 +1081,10 @@ static void build_subroutines(BuildCtx *ctx)
 #ifdef LJ_COLONY
   |  checkfunc CARG4, >1
   |   ldr CARG2, LFUNC:CARG3->tab
-  |  b >2
+  |   cmp CARG2, #0
+  |   bne >2
+  |  mov CARG2, #LJ_TNIL
+  |  b ->fff_restv
   |1:
 #endif
   |   mov CARG2, CARG3
