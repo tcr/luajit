@@ -809,7 +809,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
       end
 
       values[p] = parse_imm_long(imm)
-      if values[p] >= math.pow(2, bits[p]) then
+      if values[p] >= (2 ^ bits[p]) then
         werror('immediate operand larger than ' .. bits[p] .. ' bits')
       end
     end
@@ -823,7 +823,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
 
       if bits[p] then
         values[p] = parse_imm(imm, bits[p], shifts[p], 0, 0, instrlen)
-        if values[p] >= math.pow(2, bits[p]) then
+        if values[p] >= (2 ^ bits[p]) then
           werror('immediate operand larger than ' .. bits[p] .. ' bits')
         end
 
@@ -837,7 +837,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
 
       elseif bits['f'] then
         values['f'] = parse_imm(imm, bits['f'], shifts['i'], 2, 0, instrlen)
-        if values['f'] >= math.pow(2, bits['f']) then
+        if values['f'] >= (2 ^ bits['f']) then
           werror('immediate operand larger than ' .. bits['f'] .. ' bits')
         end
 
@@ -979,7 +979,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
           end
           
           values['n'] = d
-          if values['n'] and values['n'] >= shl(1, bits['n']) then
+          if values['n'] ~= nil and (not bits['n'] or values['n'] >= shl(1, bits['n'])) then
             werror('invalid size of register')
           end
 
@@ -1001,7 +1001,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
           local p3 = params[n+2]
 
           values['n'] = parse_gpr(p1)
-          if values['n'] and values['n'] >= shl(1, bits['n']) then
+          if values['n'] ~= nil and (not bits['n'] or values['n'] >= shl(1, bits['n'])) then
             werror('invalid size of register')
           end
 
@@ -1038,7 +1038,7 @@ local function parse_template_new_subset(bits, shifts, values, params, templates
 
           local p1a, p2 = match(p1, "^([^,%s]*)%s*(.*)$")
           values['n'] = parse_gpr(p1a)
-          if values['n'] ~= nil and values['n'] >= shl(1, bits['n']) then
+          if values['n'] ~= nil and (not bits['n'] or values['n'] >= shl(1, bits['n'])) then
             werror('invalid size of register')
           end
 

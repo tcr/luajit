@@ -34,7 +34,7 @@ CC= gcc
 # to slow down the C part by not omitting it. Debugging, tracebacks and
 # unwinding are not affected -- the assembler part has frame unwind
 # information and GCC emits it where needed (x64) or with -g (see CCDEBUG).
-CCOPT= -O0 -fomit-frame-pointer
+CCOPT= -O2 -fomit-frame-pointer
 # Use this if you want to generate a smaller binary (but it's slower):
 #CCOPT= -Os -fomit-frame-pointer
 # Note: it's no longer recommended to use -O3 with GCC 4.x.
@@ -72,7 +72,7 @@ CCWARN= -Wall
 # as dynamic mode.
 #
 # Mixed mode creates a static + dynamic library and a statically linked luajit.
-#BUILDMODE= mixed
+# BUILDMODE= mixed
 #
 # Static mode creates a static library and a statically linked luajit.
 BUILDMODE= static
@@ -103,13 +103,16 @@ XCFLAGS+= -DLUAJIT_DISABLE_FFI
 #XCFLAGS+= -DLUAJIT_ENABLE_LUA52COMPAT
 #
 # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
-# XCFLAGS+= -DLUAJIT_DISABLE_JIT
+XCFLAGS+= -DLUAJIT_DISABLE_JIT
 #
 # Some architectures (e.g. PPC) can use either single-number (1) or
 # dual-number (2) mode. Uncomment one of these lines to override the
 # default mode. Please see LJ_ARCH_NUMMODE in lj_arch.h for details.
 #XCFLAGS+= -DLUAJIT_NUMMODE=1
 #XCFLAGS+= -DLUAJIT_NUMMODE=2
+#
+# Adds Colony semantics to build.
+#XCFLAGS+= -DLUAJIT_COLONY
 #
 ##############################################################################
 
@@ -234,6 +237,7 @@ ifneq (,$(findstring LJ_TARGET_MIPS ,$(TARGET_TESTARCH)))
   TARGET_LJARCH= mips
 else
   $(error Unsupported target architecture)
+endif
 endif
 endif
 endif
@@ -375,7 +379,7 @@ ifeq (,$(HOST_LUA))
 endif
 
 DASM_DIR= ../dynasm
-DASM= luajit $(DASM_DIR)/dynasm.lua
+DASM= $(HOST_LUA) $(DASM_DIR)/dynasm.lua
 DASM_XFLAGS=
 DASM_AFLAGS=
 DASM_ARCH= $(TARGET_LJARCH)
@@ -434,7 +438,6 @@ ifeq (ppc,$(TARGET_LJARCH))
   ifeq (PS3,$(TARGET_SYS))
     DASM_AFLAGS+= -D PPE -D TOC
   endif
-endif
 endif
 endif
 endif

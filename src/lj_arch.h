@@ -456,4 +456,11 @@
 #define LJ_52			0
 #endif
 
+/* Colony smantics */
+#ifdef LUAJIT_COLONY
+#define LJ_COLONY		1
+#else
+#define LJ_COLONY		0
+#endif
+
 #endif
