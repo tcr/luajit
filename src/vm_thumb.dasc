@@ -2553,9 +2553,9 @@ static void build_subroutines(BuildCtx *ctx)
   |   add CARG3, sp, #CFRAME_SIZE
   |    mov CARG1, CTSTATE
   |  lsr CARG4, CARG4, #3
-  |   str CARG3, CTSTATE->cb.stack
+  |   str.w CARG3, CTSTATE->cb.stack
   |    mov CARG2, sp
-  |  str CARG4, CTSTATE->cb.slot
+  |  str.w CARG4, CTSTATE->cb.slot
   |  str CTSTATE, SAVE_PC		// Any value outside of bytecode is ok.
   |  bl extern lj_ccallback_enter	// (CTState *cts, void *cf)
   |  // Returns lua_State *.
