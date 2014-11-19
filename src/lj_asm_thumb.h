@@ -231,7 +231,7 @@ static uint32_t asm_fuseopm(ASMState *as, ARMIns ai, IRRef ref, RegSet allow)
   IRIns *ir = IR(ref);
   if (ra_hasreg(ir->r)) {
     ra_noweak(as, ir->r);
-    return ARMF_M(ir->r);
+    return ARMF_M2(ir->r);
   } else if (irref_isk(ref)) {
     uint32_t k = emit_isk12(ai, ir->i);
     if (k)
