@@ -1951,7 +1951,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  rsb RB, RB, #20
   |  lsl CARG1, CARG2, #12
   |   cmp CARG2, #0
-  |  orr CARG1, CARG4, CARG1, lsl RB
+  |  lsl CARG1, CARG1, RB
+  |  orr CARG1, CARG4, CARG1
   |   rsblt CARG1, CARG1, #0
   |  bx lr
   |
@@ -2306,13 +2307,18 @@ static void build_subroutines(BuildCtx *ctx)
   |  subs RB, CARG4, RB, asr #21	// 2^0: RB = 51, 2^51: RB = 0.
   |  bxlo lr				// |x| >= 2^52: done.
   |  mvn CARG4, #1
-  |   bic CARG3, CARG1, CARG4, lsl RB	// ztest = lo & ~lomask
-  |  and CARG1, CARG1, CARG4, lsl RB	// lo &= lomask
+  |  lsl CARG4, CARG4, RB
+  |   bic CARG3, CARG1, CARG4	// ztest = lo & ~lomask
+  |  and CARG1, CARG1, CARG4	// lo &= lomask
   |  subs RB, RB, #32
-  |   bicpl CARG4, CARG2, CARG4, lsl RB	// |x| <= 2^20: ztest |= hi & ~himask
+  |  mvn CARG4, #1
+  |  lsl CARG4, CARG4, RB
+  |   bicpl CARG4, CARG2, CARG4	// |x| <= 2^20: ztest |= hi & ~himask
   |   orrpl CARG3, CARG3, CARG4
   |   mvnpl CARG4, #1
-  |  andpl CARG2, CARG2, CARG4, lsl RB	// |x| <= 2^20: hi &= himask
+  |  itt pl
+  |   lslpl CARG4, CARG4, RB
+  |  andpl CARG2, CARG2, CARG4	// |x| <= 2^20: hi &= himask
   |.if "func" == "floor"
   |   tst CARG3, CARG2, asr #31		// iszero = ((ztest & signmask) == 0)
   |.else
@@ -2327,7 +2333,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  lslpl CARG3, CARG4, RB
   |  mvnmi CARG3, #0
   |  add RB, RB, #32
-  |  subs CARG1, CARG1, CARG4, lsl RB	// lo = lo-lomask
+  |  lsl CARG4, CARG4, RB
+  |  subs CARG1, CARG1, CARG4	// lo = lo-lomask
   |  sbc CARG2, CARG2, CARG3		// hi = hi-himask+carry
   |.if hf == 1
   |  vmov d0, CARG1, CARG2
@@ -2344,12 +2351,16 @@ static void build_subroutines(BuildCtx *ctx)
   |.endif
   |  mov CARG1, #0			// lo = 0
   |  and CARG2, CARG2, #0x80000000
-  |  ldrne CARG4, <9			// hi = sign(x) | (iszero ? 0.0 : 1.0)
+  |  ldrne CARG4, >9			// hi = sign(x) | (iszero ? 0.0 : 1.0)
   |  orrne CARG2, CARG2, CARG4
   |.if hf == 1
   |  vmov d0, CARG1, CARG2
   |.endif
   |  bx lr
+  |
+  |.align 8
+  |9:
+  |  .long 0x00000000, 0x41e00000 // 2^31.
   |.endmacro
   |
   |9:
@@ -2386,9 +2397,12 @@ static void build_subroutines(BuildCtx *ctx)
   |  subs RB, CARG4, RB, asr #21	// 2^0: RB = 51, 2^51: RB = 0.
   |  bxlo lr				// |x| >= 2^52: already done.
   |  mvn CARG4, #1
-  |  and CARG1, CARG1, CARG4, lsl RB	// lo &= lomask
+  |  lsl CARG4, CARG4, RB
+  |  and CARG1, CARG1, CARG4	// lo &= lomask
   |  subs RB, RB, #32
-  |  andpl CARG2, CARG2, CARG4, lsl RB	// |x| <= 2^20: hi &= himask
+  |  mvn CARG4, #1
+  |  lsl CARG4, CARG4, RB
+  |  andpl CARG2, CARG2, CARG4	// |x| <= 2^20: hi &= himask
   |.if hf == 1
   |  vmov d0, CARG1, CARG2
   |.endif
