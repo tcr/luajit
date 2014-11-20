@@ -527,9 +527,6 @@ typedef struct global_State {
   lua_CFunction panic;	/* Called as a last resort for errors. */
   BCIns bc_cfunc_int;	/* Bytecode for internal C function calls. */
   BCIns bc_cfunc_ext;	/* Bytecode for external C function calls. */
-  GCRef jit_L;		/* Current JIT code lua_State or NULL. */
-  MRef jit_base;	/* Current JIT code L->base. */
-  MRef ctype_state;	/* Pointer to C type state. */
   GCRef gcroot[GCROOT_MAX];  /* GC roots. */
   volatile int32_t vmstate;  /* VM state or current JIT code trace number. */
   lua_CFunction wrapf;  /* Wrapper for C function calls. */
@@ -539,6 +536,9 @@ typedef struct global_State {
   int32_t hookcount;  /* Instruction hook countdown. */
   int32_t hookcstart; /* Start count for instruction hook counter. */
   GCState gc;   /* Garbage collector. */
+  MRef ctype_state; /* Pointer to C type state. */
+  GCRef jit_L;    /* Current JIT code lua_State or NULL. */
+  MRef jit_base;  /* Current JIT code L->base. */
 } global_State;
 
 #define mainthread(g)	(&gcref(g->mainthref)->th)
