@@ -190,7 +190,11 @@ void dasm_setup(Dst_DECL, const void *actionlist) {
 #define CKPL(kind, st) ((void)0)
 #endif
 
-static uint16_t dasm_immthumb(unsigned int val) {
+static int32_t dasm_immthumb(int val) {
+  if (val < 0) {
+    return -1;
+  }
+
   // fun encoding time!
   int a = (val & 0x80) >> 7;
   int abcdefgh = (val & 0xFF);
@@ -372,7 +376,7 @@ void dasm_put(Dst_DECL, int start, ...) {
         b[pos++] = n;
         break;
       case DASM_IMMTHUMB:
-        CK(dasm_immthumb((unsigned int)n) != -1, RANGE_I);
+        CK(dasm_immthumb(n) != -1, RANGE_I);
         b[pos++] = n;
         break;
       }
@@ -615,7 +619,7 @@ int dasm_encode(Dst_DECL, void *buffer) {
             cp[-1] |= n & 0xFF;
             break;
           case DASM_IMMTHUMB:
-            thumbexp = dasm_immthumb((unsigned int)n);
+            thumbexp = dasm_immthumb(n);
             cp[-2] |= ((thumbexp >> 11) & 0x1) << 10;
             cp[-1] |= ((thumbexp >> 8) & 0x7) << 12;
             cp[-1] |= thumbexp & 0xFF;

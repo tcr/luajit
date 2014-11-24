@@ -261,7 +261,7 @@
 |.macro hotcheck, delta
 |  lsr CARG1, PC, #1
 |  and CARG1, CARG1, #126
-|  sub CARG1, CARG1, #-GG_DISP2HOT
+|  add CARG1, CARG1, #GG_DISP2HOT
 |  ldrh CARG2, [DISPATCH, CARG1]
 |  subs CARG2, CARG2, #delta
 |  strh CARG2, [DISPATCH, CARG1]
