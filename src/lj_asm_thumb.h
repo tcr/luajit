@@ -1406,12 +1406,12 @@ static void asm_tbar(ASMState *as, IRIns *ir)
 		     rset_exclude(rset_exclude(RSET_GPR, tab), link));
   Reg mark = RID_TMP;
   MCLabel l_end = emit_label(as);
-  emit_lso(as, ARMI_STR, link, tab, (int32_t)offsetof(GCtab, gclist));
+  emit_lso(as, ARMI_STRi, link, tab, (int32_t)offsetof(GCtab, gclist));
   emit_lso(as, ARMI_STRB, mark, tab, (int32_t)offsetof(GCtab, marked));
-  emit_lso(as, ARMI_STR, tab, gr,
+  emit_lso(as, ARMI_STRi, tab, gr,
 	   (int32_t)offsetof(global_State, gc.grayagain));
   emit_dn(as, ARMY_K12_BARE(ARMI_BIC, LJ_GC_BLACK), mark, mark);
-  emit_lso(as, ARMI_LDR, link, gr,
+  emit_lso(as, ARMI_LDRi, link, gr,
 	   (int32_t)offsetof(global_State, gc.grayagain));
   emit_branch(as, ARMY_CCB(ARMI_B, CC_EQ), l_end);
   ARMY_IT(CC_EQ);

@@ -21,23 +21,26 @@
 
 /* -- Constant encoding --------------------------------------------------- */
 
-static uint8_t emit_invai[16] = {
-  /* AND */ (ARMI_AND^ARMI_BIC) >> 5,
-  /* EOR */ 0,
-  /* SUB */ (ARMI_SUB^ARMI_ADD) >> 5,
+#define INVAI_MASK 0xfbe0
+
+static uint32_t emit_invai[16] = {
+  /* AND, TST */ (ARMI_AND^ARMI_BIC) & INVAI_MASK,
+  /* BIC */ (ARMI_BIC^ARMI_AND) & INVAI_MASK,
+  /* MOV, ORR */ (ARMI_MOV^ARMI_MVN) & INVAI_MASK,
+  /* MVN, ORN */ (ARMI_MVN^ARMI_MOV) & INVAI_MASK,
+  /* EOR, TEQ */ 0,
+  0,
+  0,
+  0,
+  /* ADD, CMN */ (ARMI_ADD^ARMI_SUB) & INVAI_MASK,
+  0,
+  /* ADC */ (ARMI_ADC^ARMI_SBC) & INVAI_MASK,
+  /* SBC */ (ARMI_SBC^ARMI_ADC) & INVAI_MASK,
+  0,
+  /* SUB, CMP */ (ARMI_SUB^ARMI_ADD) & INVAI_MASK,
   /* RSB */ 0,
-  /* ADD */ (ARMI_ADD^ARMI_SUB) >> 5,
-  /* ADC */ (ARMI_ADC^ARMI_SBC) >> 5,
-  /* SBC */ (ARMI_SBC^ARMI_ADC) >> 5,
-  /* RSC */ 0,
-  /* TST */ 0,
-  /* TEQ */ 0,
-  /* CMP */ (ARMI_CMP^ARMI_CMN) >> 5,
-  /* CMN */ (ARMI_CMN^ARMI_CMP) >> 5,
-  /* ORR */ 0,
-  /* MOV */ (ARMI_MOV^ARMI_MVN) >> 5,
-  /* BIC */ (ARMI_BIC^ARMI_AND) >> 5,
-  /* MVN */ (ARMI_MVN^ARMI_MOV) >> 5
+  0
+  // /* RSC */ 0,
 };
 
 /* Encode constant in K12 format for data processing instructions. */
@@ -51,15 +54,15 @@ static uint32_t emit_isk12(ARMIns ai, int32_t n)
       else if (i < 128*8) return ARMY_K12(0, m & 0xff);
     }
   /* Otherwise try negation/complement with the inverse instruction. */
-  invai = emit_invai[((ai >> 21) & 15)];
+  invai = emit_invai[(ai >> 5) & 0xf];
   if (!invai) return 0;  /* Failed. No inverse instruction. */
   m = ~(uint32_t)n;
-  if (invai == ((ARMI_SUB^ARMI_ADD) >> 21) ||
-      invai == (ARMI_CMP^ARMI_CMN) >> 21) m++;
+  if (invai == ((ARMI_SUB^ARMI_ADD) & INVAI_MASK) ||
+      invai == ((ARMI_CMP^ARMI_CMN) & INVAI_MASK)) m++;
   for (i = 0; i < 4096; i += 128, m = lj_rol(m, 1))
     if (m <= 255) {
-      if (m & 0x80 && i > 128*8) return ARMY_K12(invai<<21, i|(m & 0x7f));
-      else if (i < 128*8) return ARMY_K12(invai<<21, m & 0xff);
+      if (m & 0x80 && i > 128*8) return ARMY_K12(invai, i|(m & 0x7f));
+      else if (i < 128*8) return ARMY_K12(invai, m & 0xff);
     }
   return 0;  /* Failed. */
 }
@@ -70,27 +73,29 @@ static uint32_t emit_isthumb(ARMIns ai, int32_t n)
   uint32_t invai, i, m = (uint32_t)n;
   /* K12: unsigned 8 bit value, rotated in steps of one bit. */
   if (n > 0) {
-  for (i = 0; i < 4096; i += 128, m = lj_rol(m, 1))
-    if (m <= 255) {
-      if (m & 0x80 && i > 128*8) return ARMY_K12_BARE(0, i|(m & 0x7f));
-      else if (i < 128*8) return ARMY_K12_BARE(0, m & 0xff);
-    }
+    for (i = 0; i < 4096; i += 128, m = lj_rol(m, 1))
+      if (m <= 255) {
+        if (m & 0x80 && i > 128*8) return ARMY_K12_BARE(0, i|(m & 0x7f));
+        else if (i < 128*8) return ARMY_K12_BARE(0, m & 0xff);
+      }
   }
   /* Otherwise try negation/complement with the inverse instruction. */
-  invai = emit_invai[((ai >> 5) & 15)];
+  invai = emit_invai[(ai >> 5) & 0xf];
   if (!invai) return 0;  /* Failed. No inverse instruction. */
   m = ~(uint32_t)n;
-  if (invai == ((ARMI_SUB^ARMI_ADD) >> 5) ||
-      invai == (ARMI_CMP^ARMI_CMN) >> 5) m++;
+  if (invai == ((ARMI_SUB^ARMI_ADD) & INVAI_MASK) ||
+      invai == ((ARMI_CMP^ARMI_CMN) & INVAI_MASK)) m++;
   for (i = 0; i < 4096; i += 128, m = lj_rol(m, 1))
     if (m <= 255) {
-      if (m & 0x80 && i > 128*8) return ARMY_K12_BARE(invai<<21, i|(m & 0x7f));
-      else if (i < 128*8) return ARMY_K12_BARE(invai<<21, m & 0xff);
+      if (m & 0x80 && i > 128*8) return ARMY_K12_BARE(invai, i|(m & 0x7f));
+      else if (i < 128*8) return ARMY_K12_BARE(invai, m & 0xff);
     }
   return 0;  /* Failed. */
 }
 
 /* -- Emit basic instructions --------------------------------------------- */
+
+int _glob = 0;
 
 static void emit_dnm(ASMState *as, ARMIns ai, Reg rd, Reg rn, Reg rm)
 {
@@ -126,6 +131,7 @@ static void emit_nm(ASMState *as, ARMIns ai, Reg rn, Reg rm)
 static void emit_d(ASMState *as, ARMIns ai, Reg rd)
 {
   *--as->mcp = ARMY_D(ai, rd);
+  _glob++;
 }
 
 static void emit_n(ASMState *as, ARMIns ai, Reg rn)
@@ -137,8 +143,6 @@ static void emit_m(ASMState *as, ARMIns ai, Reg rm)
 {
   *--as->mcp = ARMY_M(ai, rm);
 }
-
-int _glob = 0;
 
 static void emit_lsox(ASMState *as, ARMIns ai, Reg rd, Reg rn, int32_t ofs)
 {
@@ -243,10 +247,10 @@ static void emit_loadi(ASMState *as, Reg r, int32_t i)
   lua_assert(rset_test(as->freeset, r) || r == RID_TMP);
   if (k) {
     /* Standard K12 constant. */
-    emit_d(as, ARMY_K12(ARMI_MOV, emit_isthumb(ARMI_MOV, i)), r);
+    emit_d(as, ARMI_MOV ^ emit_isthumb(ARMI_MOV, i), r);
   } else if ((as->flags & JIT_F_ARMV6T2) && (uint32_t)i < 0x00010000u) {
     /* 16 bit loword constant for ARMv6T2. */
-    emit_d(as, ARMI_MOVW|(i & 0x0fff)|((i & 0xf000)<<4), r);
+    emit_d(as, ARMY_MOVTW(ARMI_MOVW, i), r);
   } else if (emit_kdelta1(as, r, i)) {
     /* One step delta relative to another constant. */
   } else if (as->flags & JIT_F_ARMV6T2) {
@@ -263,10 +267,10 @@ static void emit_loadi(ASMState *as, Reg r, int32_t i)
       int32_t m = i & (255 << sh);
       i &= ~(255 << sh);
       if (i == 0) {
-	emit_d(as, ARMY_OP_BODY(ARMI_MOV, emit_isk12(0, m)), r);
+	emit_d(as, ARMY_OP_BODY(ARMI_MOV, emit_isthumb(0, m)), r);
 	break;
       }
-      emit_dn(as, ARMY_OP_BODY(ARMI_ORR, emit_isk12(0, m)), r, r);
+      emit_dn(as, ARMY_OP_BODY(ARMI_ORR, emit_isthumb(0, m)), r, r);
     }
   }
 }
