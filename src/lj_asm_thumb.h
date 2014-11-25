@@ -235,7 +235,7 @@ static uint32_t asm_fuseopm(ASMState *as, ARMIns ai, IRRef ref, RegSet allow)
   } else if (irref_isk(ref)) {
     uint32_t k = emit_isk12(ai, ir->i);
     if (k)
-      return k;
+      return emit_isthumb(ai, ir->i);
   } else if (mayfuse(as, ref)) {
     if (ir->o >= IR_BSHL && ir->o <= IR_BROR) {
       Reg m = ra_alloc1(as, ir->op1, allow);
@@ -253,7 +253,7 @@ static uint32_t asm_fuseopm(ASMState *as, ARMIns ai, IRRef ref, RegSet allow)
       return m | ARMF_SH(ARMSH_LSL, 1);
     }
   }
-  return ra_allocref(as, ref, allow);
+  return ARMF_M2(ra_allocref(as, ref, allow));
 }
 
 /* Fuse shifts into loads/stores. Only bother with BSHL 2 => lsl #2. */
@@ -743,7 +743,7 @@ static void asm_tvptr(ASMState *as, Reg dest, IRRef ref)
     /* Otherwise use [sp] and [sp+4] to hold the TValue. */
     RegSet allow = rset_exclude(RSET_GPR, dest);
     Reg type;
-    emit_dm(as, ARMI_MOV, dest, RID_SP);
+    emit_dm2(as, ARMI_MOV, dest, RID_SP);
     if (!irt_ispri(ir->t)) {
       Reg src = ra_alloc1(as, ref, allow);
       emit_lso(as, ARMI_STR, src, RID_SP, 0);
@@ -982,13 +982,16 @@ static void asm_hrefk(ASMState *as, IRIns *ir)
   }
   rset_clear(allow, type);
   if (irt_isnum(irkey->t)) {
-    emit_opk(as, ARMF_CC(ARMI_CMP, CC_EQ), 0, type,
+    emit_opk(as, ARMY_CCB(ARMI_CMP, CC_EQ), 0, type,
 	     (int32_t)ir_knum(irkey)->u32.hi, allow);
+    ARMY_IT(CC_EQ);
     emit_opk(as, ARMI_CMP, 0, key,
 	     (int32_t)ir_knum(irkey)->u32.lo, allow);
   } else {
-    if (ra_hasreg(key))
-      emit_opk(as, ARMF_CC(ARMI_CMP, CC_EQ), 0, key, irkey->i, allow);
+    if (ra_hasreg(key)) {
+      emit_opkthumb(as, ARMY_CCB(ARMI_CMP, CC_EQ), ARMY_CCB(ARMI_CMPr, CC_EQ), 0, key, irkey->i, allow);
+      ARMY_IT(CC_EQ);
+    }
     emit_n(as, ARMY_K12(ARMI_CMN, -irt_toitype(irkey->t)), type);
   }
   emit_lso(as, ARMI_LDR, type, idx, kofs+4);
@@ -1376,12 +1379,12 @@ static void asm_tbar(ASMState *as, IRIns *ir)
   emit_lso(as, ARMI_STRB, mark, tab, (int32_t)offsetof(GCtab, marked));
   emit_lso(as, ARMI_STR, tab, gr,
 	   (int32_t)offsetof(global_State, gc.grayagain));
-  emit_dn(as, ARMY_K12(ARMI_BIC, LJ_GC_BLACK), mark, mark);
+  emit_dn(as, ARMY_K12_BARE(ARMI_BIC, LJ_GC_BLACK), mark, mark);
   emit_lso(as, ARMI_LDR, link, gr,
 	   (int32_t)offsetof(global_State, gc.grayagain));
   emit_branch(as, ARMY_CCB(ARMI_B, CC_EQ), l_end);
   ARMY_IT(CC_EQ);
-  emit_n(as, ARMY_K12(ARMI_TST, LJ_GC_BLACK), mark);
+  emit_n(as, ARMY_K12_BARE(ARMI_TST, LJ_GC_BLACK), mark);
   emit_lso(as, ARMI_LDRB, mark, tab, (int32_t)offsetof(GCtab, marked));
 }
 
@@ -1850,9 +1853,13 @@ static void asm_intcomp(ASMState *as, IRIns *ir)
   }
 notst:
   left = ra_alloc1(as, lref, RSET_GPR);
-  m = asm_fuseopm(as, ARMI_CMP, rref, rset_exclude(RSET_GPR, left));
+  //TODO need better way to check this out than this
+  // because K12 may fail and then it would return a register
+  // and that's bad news bears
+  ARMIns ai = irref_isk(rref) ? ARMI_CMP : ARMI_CMPr;
+  m = asm_fuseopm(as, ai, rref, rset_exclude(RSET_GPR, left));
   asm_guardcc(as, cc);
-  emit_n(as, ARMY_OP_BODY(ARMI_CMP, m), left);
+  emit_n(as, ARMY_OP_BODY(ai, m), left);
   /* Signed comparison with zero and referencing previous ins? */
   if (cmpprev0 && (cc <= CC_NE || cc >= CC_GE))
     as->flagmcp = as->mcp;  /* Allow elimination of the compare. */

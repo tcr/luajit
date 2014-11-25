@@ -150,14 +150,18 @@ typedef struct {
 #define ARMF_S(r)	((r) << 8)
 #define ARMF_M(r)	((r) << 8)
 #define ARMF_M2(r) ((r) << 16) // MOV
+#define ARMF_M3(r) ((r) << 20) // BLXr
 #define ARMF_SH(sh, n)	(((sh) << 5) | ((n) << 7))
 #define ARMF_RSH(sh, r)	(0x10 | ((sh) << 5) | ARMF_S(r))
 
 /* Instruction compositing */
 #define ARMY_SUB(arg, rsh, mask) (((arg)>>rsh)&(((1<<(mask))-1)))
 #define ARMY_K12(A, B) ((A^ARMI_K12)|(((B)&0xff)<<16)|(((B)&0x700)<<20)|(((B)&0x800)>>1))
+#define ARMY_K12_BARE(A, B) ((A)|(((B)&0xff)<<16)|(((B)&0x700)<<20)|(((B)&0x800)>>1))
 #define ARMY_OP_BODY(A, B) ((A)^(B))
 #define ARMY_B(A, B) ((A)|(ARMY_SUB(B,0,10)<<17)|ARMY_SUB(B,10,10)|(ARMY_SUB(B,20,1)<<28)|(ARMY_SUB(B,21,1)<<29)|(ARMY_SUB(B,22,1)<<10))
+
+#define ARMY_NODEF 0xffffffff
 
 typedef enum ARMIns {
   ARMI_CCAL = 0xe0000000,
@@ -175,44 +179,62 @@ typedef enum ARMIns {
   ARMI_LS_P = 0x04000000,
   // ARMI_LS_P = 0x01000000,
   ARMI_LS_R = 0x02000000,
-  ARMI_LSX_I = 0x00400000,
+  ARMI_LSX_I = 0x00000040,
 
   // 11110H00000snnnn0HHHddddHHHHHHHH
   // 11101010000snnnn0iiiddddiiTTmmmm
-  ARMI_AND = 0xe0000000,
+  ARMI_AND = ARMY_NODEF,
+  // ARMI_AND = 0xe0000000,
+  
   // 11110H00100snnnn0HHHddddHHHHHHHH
   // 11101010100snnnn0iiiddddiiTTmmmm
-  ARMI_EOR = 0xe0200000,
+  ARMI_EOR = ARMY_NODEF,
+  // ARMI_EOR = 0xe0200000,
+  
   // 11110H01101snnnn0HHHddddHHHHHHHH
   // 11101011101snnnn0iiiddddiiTTmmmm
-  ARMI_SUB = 0xe0400000,
+  ARMI_SUB = 0x0000f1a0,
+  // ARMI_SUB = 0xe0400000,
+
   // 11110H01110snnnn0HHHddddHHHHHHHH
   // 11101011110snnnn0iiiddddiiTTmmmm
-  ARMI_RSB = 0xe0600000,
+  ARMI_RSB = ARMY_NODEF,
+  // ARMI_RSB = 0xe0600000,
   
   // 11110H01000snnnn0HHHddddHHHHHHHH
   // 11101011000snnnn0iiiddddiiTTmmmm
-  ARMI_ADD = 0x0000eb00,
+  // ARMI_ADD = 0x0000eb00,
+  ARMI_ADD = 0x0000f100,
   // ARMI_ADD = 0xe0800000,
 
   // 11110H01010snnnn0HHHddddHHHHHHHH
   // 11101011010snnnn0iiiddddiiTTmmmm
-  ARMI_ADC = 0xe0a00000,
+  ARMI_ADC = ARMY_NODEF,
+  // ARMI_ADC = 0xe0a00000,
+
   // 11110H01011snnnn0HHHddddHHHHHHHH
   // 11101011011snnnn0iiiddddiiTTmmmm
-  ARMI_SBC = 0xe0c00000,
+  ARMI_SBC = ARMY_NODEF,
+  // ARMI_SBC = 0xe0c00000,
+
   // TODO fix this on thumb
-  ARMI_RSC = 0xe0e00000,
+  ARMI_RSC = ARMY_NODEF,
+  // ARMI_RSC = 0xe0e00000,
+
   // 11110H000001nnnn0HHH1111HHHHHHHH
   // 111010100001nnnn0iii1111iiTTmmmm
-  ARMI_TST = 0xe1100000,
+  ARMI_TST = 0x0f00f008,
+  // ARMI_TST = 0xe1100000,
+
   // 11110H001001nnnn0HHH1111HHHHHHHH
   // 111010101001nnnn0iii1111iiTTmmmm
-  ARMI_TEQ = 0xe1300000,
+  ARMI_TEQ = ARMY_NODEF,
+  // ARMI_TEQ = 0xe1300000,
 
   // 11110H011011nnnn0HHH1111HHHHHHHH
   // 111010111011nnnn0iii1111iiTTmmmm
-  ARMI_CMP = 0x0f00ebb0,
+  ARMI_CMP = 0x0f00f1b0,
+  ARMI_CMPr = 0x0f00ebb0,
   // ARMI_CMP = 0xe1500000,
   
   // 11110H010001nnnn0HHH1111HHHHHHHH
@@ -223,6 +245,7 @@ typedef enum ARMIns {
   // 11110H00010snnnn0HHHddddHHHHHHHH
   // 11101010010snnnn0iiiddddiiTTmmmm
   ARMI_ORR = 0x0000ea40,
+  // ARMI_ORR = 0x0000ea40,
   
   // 11110H00010s11110HHHddddHHHHHHHH
   // 11101010010s11110000dddd0000mmmm
@@ -231,20 +254,27 @@ typedef enum ARMIns {
 
   // 11110H00001snnnn0HHHddddHHHHHHHH
   // 11101010001snnnn0iiiddddiiTTmmmm
-  ARMI_BIC = 0xe1c00000,
+  ARMI_BIC = 0x0000f020,
+  // ARMI_BIC = 0xe1c00000,
+
   // 11110H00011s11110HHHddddHHHHHHHH
   // 11101010011s11110iiiddddiiTTmmmm
-  ARMI_MVN = 0xe1e00000,
+  ARMI_MVN = ARMY_NODEF,
+  // ARMI_MVN = 0xe1e00000,
 
   // 11110011101011111000000000000000
-  ARMI_NOP = 0xe1a00000,
+  ARMI_NOP = ARMY_NODEF,
+  // ARMI_NOP = 0xe1a00000,
 
   // -
   // 111110110000nnnn1111dddd0000mmmm
-  ARMI_MUL = 0xe0000090,
+  ARMI_MUL = ARMY_NODEF,
+  // ARMI_MUL = 0xe0000090,
+
   // -
   // 111110111000nnnnllllhhhh0000mmmm
-  ARMI_SMULL = 0xe0c00090,
+  ARMI_SMULL = ARMY_NODEF,
+  // ARMI_SMULL = 0xe0c00090,
 
   // tL:111110001101nnnnttttiiiiiiiiiiii
   // tL:111110000101nnnntttt1PUWiiiiiiii
@@ -260,24 +290,33 @@ typedef enum ARMIns {
   // tL:111110000001nnnntttt000000iimmmm
   // tL:111110001001nnnnttttiiiiiiiiiiii
   // tB:11111000u0011111ttttiiiiiiiiiiii
-  ARMI_LDRB = 0xe4500000,
+  ARMI_LDRB = 0x0800f810,
+  // ARMI_LDRB = 0xe4500000,
+
   // tL:111110001011nnnnttttiiiiiiiiiiii
   // tL:111110000011nnnntttt1PUWiiiiiiii
   // tL:111110000011nnnntttt000000iimmmm
   // tB:11111000u0111111ttttiiiiiiiiiiii
-  ARMI_LDRH = 0xe01000b0,
+  ARMI_LDRH = ARMY_NODEF,
+  // ARMI_LDRH = 0xe01000b0,
+
   // tL:111110011001nnnnttttiiiiiiiiiiii
   // tL:111110010001nnnntttt1PUWiiiiiiii
   // tL:111110010001nnnntttt000000iimmmm
-  ARMI_LDRSB = 0xe01000d0,
+  ARMI_LDRSB = ARMY_NODEF,
+  // ARMI_LDRSB = 0xe01000d0,
+
   // tL:111110011011nnnnttttiiiiiiiiiiii
   // tL:111110010011nnnntttt1PUWiiiiiiii
   // tL:111110010011nnnntttt000000iimmmm
   // tB:11111001u0111111ttttiiiiiiiiiiii
-  ARMI_LDRSH = 0xe01000f0,
+  ARMI_LDRSH = ARMY_NODEF,
+  // ARMI_LDRSH = 0xe01000f0,
+
   // tdLi:1110100PU1W1nnnnttttddddffffffff
   // tdB:1110100PU1W11111ttttddddiiiiiiii
-  ARMI_LDRD = 0xe00000d0,
+  ARMI_LDRD = ARMY_NODEF,
+  // ARMI_LDRD = 0xe00000d0,
   
   // tL:111110001100nnnnttttiiiiiiiiiiii
   // tL:111110000100nnnntttt1PUWiiiiiiii
@@ -288,15 +327,22 @@ typedef enum ARMIns {
   // tL:111110001000nnnnttttiiiiiiiiiiii
   // tL:111110000000nnnntttt1PUWiiiiiiii
   // tL:111110000000nnnntttt000000iimmmm
-  ARMI_STRB = 0xe4400000,
+  ARMI_STRB = 0x0800f800,
+  // ARMI_STRB = 0xe4400000,
+
   // tL:111110001010nnnnttttiiiiiiiiiiii
   // tL:111110000010nnnntttt1PUWiiiiiiii
-  ARMI_STRH = 0xe00000b0,
+  ARMI_STRH = ARMY_NODEF-2,
+  // ARMI_STRH = 0xe00000b0,
+
   // tdL:1110100PU1W0nnnnttttddddffffffff
-  ARMI_STRD = 0xe00000f0,
+  ARMI_STRD = ARMY_NODEF-3,
+  // ARMI_STRD = 0xe00000f0,
+
   // r:1110100100101101rrrrrrrrrrrrrrrr
   // t:1111100001001101tttt110100000100
-  ARMI_PUSH = 0xe92d0000,
+  ARMI_PUSH = ARMY_NODEF,
+  // ARMI_PUSH = 0xe92d0000,
 
   // 11110scccciiiiii10j0kiiiiiiiiiii
   // 11110siiiiiiiiii10j1kiiiiiiiiiii
@@ -312,25 +358,33 @@ typedef enum ARMIns {
   // ARMI_BLX = 0xfa000000,
 
   // 010001111mmmm000
-  ARMI_BLXr = 0xe12fff30,
+  ARMI_BLXr = 0x4780bf00,
+  // ARMI_BLXr = 0xe12fff30,
 
   /* ARMv6 */
   // 111110101001mmmm1111dddd1000xxxx
-  ARMI_REV = 0xe6bf0f30,
+  ARMI_REV = ARMY_NODEF,
+  // ARMI_REV = 0xe6bf0f30,
   // 11111010010011111111dddd10rrmmmm
-  ARMI_SXTB = 0xe6af0070,
+  ARMI_SXTB = ARMY_NODEF,
+  // ARMI_SXTB = 0xe6af0070,
   // 11111010000011111111dddd10rrmmmm
-  ARMI_SXTH = 0xe6bf0070,
+  ARMI_SXTH = ARMY_NODEF,
+  // ARMI_SXTH = 0xe6bf0070,
   // 11111010010111111111dddd10rrmmmm
-  ARMI_UXTB = 0xe6ef0070,
+  ARMI_UXTB = ARMY_NODEF,
+  // ARMI_UXTB = 0xe6ef0070,
   // 11111010000111111111dddd10rrmmmm
-  ARMI_UXTH = 0xe6ff0070,
+  ARMI_UXTH = ARMY_NODEF,
+  // ARMI_UXTH = 0xe6ff0070,
 
   /* ARMv6T2 */
   // 11110H100100kkkk0HHHddddHHHHHHHH
-  ARMI_MOVW = 0xe3000000,
+  ARMI_MOVW = 0x0000f240,
+  // ARMI_MOVW = 0xe3000000,
   // 11110H101100kkkk0HHHddddHHHHHHHH
-  ARMI_MOVT = 0xe3400000,
+  ARMI_MOVT = 0x0000f2c0,
+  // ARMI_MOVT = 0xe3400000,
 
   /* VFP */
   ARMI_VMOV_D = 0xeeb00b40,

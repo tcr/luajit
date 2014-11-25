@@ -34,7 +34,7 @@
 #define JIT_F_VFPV3		0x00000100
 
 #define JIT_F_ARMV6		(JIT_F_ARMV6_|JIT_F_ARMV6T2_|JIT_F_ARMV7)
-#define JIT_F_ARMV6T2		(JIT_F_ARMV6T2_|JIT_F_ARMV7)
+#define JIT_F_ARMV6T2		(JIT_F_ARMV6T2_|JIT_F_ARMV7|LJ_TARGET_THUMB)
 #define JIT_F_VFP		(JIT_F_VFPV2|JIT_F_VFPV3)
 
 /* Names for the CPU-specific flags. Must match the order above. */
