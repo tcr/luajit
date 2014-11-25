@@ -256,6 +256,37 @@ static uint32_t asm_fuseopm(ASMState *as, ARMIns ai, IRRef ref, RegSet allow)
   return ARMF_M2(ra_allocref(as, ref, allow));
 }
 
+/* Fuse m operand into arithmetic/logic instructions. */
+static uint32_t asm_fuseopmthumb(ASMState *as, ARMIns aik, ARMIns air, IRRef ref, RegSet allow)
+{
+  IRIns *ir = IR(ref);
+  if (ra_hasreg(ir->r)) {
+    ra_noweak(as, ir->r);
+    return ARMY_OP_BODY(air, ARMF_M2(ir->r));
+  } else if (irref_isk(ref)) {
+    uint32_t k = emit_isk12(aik, ir->i);
+    if (k)
+      return ARMY_OP_BODY(aik, emit_isthumb(aik, ir->i));
+  } else if (mayfuse(as, ref)) {
+    if (ir->o >= IR_BSHL && ir->o <= IR_BROR) {
+      Reg m = ra_alloc1(as, ir->op1, allow);
+      ARMShift sh = ir->o == IR_BSHL ? ARMSH_LSL :
+                    ir->o == IR_BSHR ? ARMSH_LSR :
+                    ir->o == IR_BSAR ? ARMSH_ASR : ARMSH_ROR;
+      if (irref_isk(ir->op2)) {
+        return ARMY_OP_BODY(air, ARMF_M2(m | ARMF_SH(sh, (IR(ir->op2)->i & 31))));
+      } else {
+        Reg s = ra_alloc1(as, ir->op2, rset_exclude(allow, m));
+        return ARMY_OP_BODY(air, ARMF_M2(m | ARMF_RSH(sh, s)));
+      }
+    } else if (ir->o == IR_ADD && ir->op1 == ir->op2) {
+      Reg m = ra_alloc1(as, ir->op1, allow);
+      return ARMY_OP_BODY(air, ARMF_M2(m | ARMF_SH(ARMSH_LSL, 1)));
+    }
+  }
+  return ARMY_OP_BODY(air, ARMF_M2(ra_allocref(as, ref, allow)));
+}
+
 /* Fuse shifts into loads/stores. Only bother with BSHL 2 => lsl #2. */
 static IRRef asm_fuselsl2(ASMState *as, IRRef ref)
 {
@@ -1817,7 +1848,6 @@ static void asm_intcomp(ASMState *as, IRIns *ir)
   ARMCC cc = (asm_compmap[ir->o] & 15);
   IRRef lref = ir->op1, rref = ir->op2;
   Reg left;
-  uint32_t m;
   int cmpprev0 = 0;
   lua_assert(irt_isint(ir->t) || irt_isu32(ir->t) || irt_isaddr(ir->t));
   if (asm_swapops(as, lref, rref)) {
@@ -1856,10 +1886,9 @@ notst:
   //TODO need better way to check this out than this
   // because K12 may fail and then it would return a register
   // and that's bad news bears
-  ARMIns ai = irref_isk(rref) ? ARMI_CMP : ARMI_CMPr;
-  m = asm_fuseopm(as, ai, rref, rset_exclude(RSET_GPR, left));
+  ARMIns ai = asm_fuseopmthumb(as, ARMI_CMP, ARMI_CMPr, rref, rset_exclude(RSET_GPR, left));
   asm_guardcc(as, cc);
-  emit_n(as, ARMY_OP_BODY(ai, m), left);
+  emit_n(as, ai, left);
   /* Signed comparison with zero and referencing previous ins? */
   if (cmpprev0 && (cc <= CC_NE || cc >= CC_GE))
     as->flagmcp = as->mcp;  /* Allow elimination of the compare. */
