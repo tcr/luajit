@@ -10,7 +10,7 @@
 #define ARMY_SH(A, B, S) ((A)|(ARMF_SH(B, S)))
 #define ARMY_RSH(A, B, S) ((A)|(ARMF_RSH(B, S)))
 #define ARMY_COND(A) ((A)|(ARMI_S))
-#define ARMY_MULL(A, B) ((A)|(ARMF_S(B)))
+#define ARMY_MULL(A, B) ((A)|(ARMF_T(B)))
 #define ARMY_IS(A, B) (((A) & ~ARMI_S) == (B))
 // reverse operand order
 #define ARMY_REVERSE(A) A ^= (ARMI_SUB)^(ARMI_RSB)
@@ -122,7 +122,7 @@ static MCode *asm_exitstub_gen(ASMState *as, ExitNo group)
 
   *mxp++ = group*EXITSTUBS_PER_GROUP;
   for (i = 0; i < EXITSTUBS_PER_GROUP; i++)
-    *mxp++ = ARMY_B(ARMI_B, -8-i);
+    *mxp++ = ARMY_B(ARMI_B, -7-i);
   lj_mcode_sync(as->mcbot, mxp);
   lj_mcode_commitbot(as->J, mxp);
   as->mcbot = mxp;
@@ -1406,12 +1406,12 @@ static void asm_tbar(ASMState *as, IRIns *ir)
 		     rset_exclude(rset_exclude(RSET_GPR, tab), link));
   Reg mark = RID_TMP;
   MCLabel l_end = emit_label(as);
-  emit_lso(as, ARMI_STRi, link, tab, (int32_t)offsetof(GCtab, gclist));
+  emit_lso(as, ARMI_STR, link, tab, (int32_t)offsetof(GCtab, gclist));
   emit_lso(as, ARMI_STRB, mark, tab, (int32_t)offsetof(GCtab, marked));
-  emit_lso(as, ARMI_STRi, tab, gr,
+  emit_lso(as, ARMI_STR, tab, gr,
 	   (int32_t)offsetof(global_State, gc.grayagain));
   emit_dn(as, ARMY_K12_BARE(ARMI_BIC, LJ_GC_BLACK), mark, mark);
-  emit_lso(as, ARMI_LDRi, link, gr,
+  emit_lso(as, ARMI_LDR, link, gr,
 	   (int32_t)offsetof(global_State, gc.grayagain));
   emit_branch(as, ARMY_CCB(ARMI_B, CC_EQ), l_end);
   ARMY_IT(CC_EQ);
@@ -1509,19 +1509,18 @@ static void asm_intop(ASMState *as, IRIns *ir, ARMIns ai)
 {
   IRRef lref = ir->op1, rref = ir->op2;
   Reg left, dest = ra_dest(as, ir, RSET_GPR);
-  uint32_t m;
   if (asm_swapops(as, lref, rref)) {
     IRRef tmp = lref; lref = rref; rref = tmp;
     if (ARMY_IS(ai, ARMI_SUB) || ARMY_IS(ai, ARMI_SBC))
       ARMY_REVERSE(ai);
   }
   left = ra_hintalloc(as, lref, dest, RSET_GPR);
-  m = asm_fuseopm(as, ai, rref, rset_exclude(RSET_GPR, left));
+  ARMIns m = asm_fuseopmthumb(as, ai, ai^0x1a00, rref, rset_exclude(RSET_GPR, left));
   if (irt_isguard(ir->t)) {  /* For IR_ADDOV etc. */
     asm_guardcc(as, CC_VS);
     // ai = ARMY_COND(ai);
   }
-  emit_dn(as, ARMY_OP_BODY(ai, m), dest, left);
+  emit_dn(as, m, dest, left);
 }
 
 static void asm_intop_s(ASMState *as, IRIns *ir, ARMIns ai)
@@ -1580,8 +1579,8 @@ static void asm_intmul(ASMState *as, IRIns *ir)
     if (!(as->flags & JIT_F_ARMV6) && dest == left)
       tmp = left = ra_scratch(as, rset_exclude(RSET_GPR, left));
     asm_guardcc(as, CC_NE);
-    emit_nm(as, ARMY_SH(ARMI_TEQ, ARMSH_ASR, 31), RID_TMP, dest);
-    emit_dnm(as, ARMY_MULL(ARMI_SMULL, right), dest, RID_TMP, left);
+    emit_nm2(as, ARMY_SH(ARMI_TEQ, ARMSH_ASR, 31), RID_TMP, dest);
+    emit_dnm2(as, ARMY_MULL(ARMI_SMULL, dest), RID_TMP, left, right);
   } else {
     if (!(as->flags & JIT_F_ARMV6) && dest == left) tmp = left = RID_TMP;
     emit_nm(as, ARMY_MULL(ARMI_MUL, right), dest, left);
@@ -2427,12 +2426,17 @@ void lj_asm_patchexit(jit_State *J, GCtrace *T, ExitNo exitno, MCode *target)
   for (; p < pe; p++) {
     /* Look for bl_cc exitstub, replace with b_cc target. */
     uint32_t ins = *p;
-    if ((ins & 0x0f000000u) == 0x0b000000u && ins < 0xf0000000u &&
-	((ins ^ (px-p)) & 0x00ffffffu) == 0) {
-      *p = (ins & 0xfe000000u) | (((target-p)-2) & 0x00ffffffu);
+    if ((ins & 0xf800f000u) == 0xf800f000u) {
+      *p = ARMY_B(ARMI_BL, target-p-2);
       cend = p+1;
       if (!cstart) cstart = p;
     }
+ //    if ((ins & 0x0f000000u) == 0x0b000000u && ins < 0xf0000000u &&
+	// ((ins ^ (px-p)) & 0x00ffffffu) == 0) {
+ //      *p = (ins & 0xfe000000u) | (((target-p)-2) & 0x00ffffffu);
+ //      cend = p+1;
+ //      if (!cstart) cstart = p;
+ //    }
   }
   lua_assert(cstart != NULL);
   lj_mcode_sync(cstart, cend);

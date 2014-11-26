@@ -9,6 +9,8 @@
 #define lj_gc_c
 #define LUA_CORE
 
+#include <assert.h>
+
 #include "lj_obj.h"
 #include "lj_gc.h"
 #include "lj_err.h"
@@ -402,6 +404,11 @@ static GCRef *gc_sweep(global_State *g, GCRef *p, uint32_t lim)
       setgcrefr(*p, o->gch.nextgc);
       if (o == gcref(g->gc.root))
 	setgcrefr(g->gc.root, o->gch.nextgc);  /* Adjust list anchor. */
+      if ((o->gch.gct - ~LJ_TSTR) >= 0 && (o->gch.gct - ~LJ_TSTR) < sizeof(gc_freefunc)) {
+
+      } else {
+        while (1) { }
+      }
       gc_freefunc[o->gch.gct - ~LJ_TSTR](g, o);
     }
   }

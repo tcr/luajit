@@ -14,6 +14,7 @@
 #define ARMY_DM(ai, rd, rm) ((ai) | ARMF_D(rd) | ARMF_M(rm))
 #define ARMY_DM2(ai, rd, rm) ((ai) | ARMF_D(rd) | ARMF_M2(rm))
 #define ARMY_NM(ai, rn, rm) ((ai) | ARMF_N(rn) | ARMF_M(rm))
+#define ARMY_NM2(ai, rn, rm) ((ai) | ARMF_N(rn) | ARMF_M2(rm))
 #define ARMY_D(ai, rd) ((ai) | ARMF_D(rd))
 #define ARMY_N(ai, rn) ((ai) | ARMF_N(rn))
 #define ARMY_M(ai, rm) ((ai) | ARMF_M(rm))
@@ -128,6 +129,11 @@ static void emit_nm(ASMState *as, ARMIns ai, Reg rn, Reg rm)
   *--as->mcp = ARMY_NM(ai, rn, rm);
 }
 
+static void emit_nm2(ASMState *as, ARMIns ai, Reg rn, Reg rm)
+{
+  *--as->mcp = ARMY_NM2(ai, rn, rm);
+}
+
 static void emit_d(ASMState *as, ARMIns ai, Reg rd)
 {
   *--as->mcp = ARMY_D(ai, rd);
@@ -155,7 +161,7 @@ static void emit_lsox(ASMState *as, ARMIns ai, Reg rd, Reg rn, int32_t ofs)
 
 static void emit_lso(ASMState *as, ARMIns ai, Reg rd, Reg rn, int32_t ofs)
 {
-  lua_assert(ofs >= -4095 && ofs <= 4095);
+  lua_assert(ofs >= -255 && ofs <= 4095);
   /* Combine LDR/STR pairs to LDRD/STRD. */
   if (*as->mcp == ARMY_OFS(ARMY_DN(ARMY_FLAG(ai, ARMI_LS_P|ARMI_LS_U), rd^1, rn),ofs^4) &&
       (ai & ~(ARMI_LDR^ARMI_STR)) == ARMI_STR && rd != rn &&
@@ -165,8 +171,13 @@ static void emit_lso(ASMState *as, ARMIns ai, Reg rd, Reg rn, int32_t ofs)
     emit_lsox(as, ai == ARMI_LDR ? ARMI_LDRD : ARMI_STRD, rd&~1, rn, ofs&~4);
     return;
   }
-  if (ofs < 0) ofs = -ofs; else ai = ARMY_FLAG(ai, ARMI_LS_U);
-  *--as->mcp = ARMY_OFS(ARMY_TN(ARMY_FLAG(ai, ARMI_LS_P), rd, rn), ofs);
+  if (ofs >= 0) {
+    ai = (ai == ARMI_LDR ? ARMI_LDRi : ARMI_STRi);
+  } else {
+    ofs = -ofs;
+    ai = ARMY_FLAG(ai, ARMI_LS_P);
+  }
+  *--as->mcp = ARMY_OFS(ARMY_TN(ai, rd, rn), ofs);
   _glob = ai ^ ARMI_LSX_I;
 }
 
@@ -199,7 +210,7 @@ static int emit_kdelta1(ASMState *as, Reg d, int32_t i)
 	if (k == ARMI_K12)
 	  emit_dm(as, ARMI_MOV, d, r);
 	else
-	  emit_dn(as, ARMY_OP_BODY(ARMI_ADD, k), d, r);
+	  emit_dn(as, ARMY_OP_BODY(ARMI_ADD, emit_isthumb(ARMI_ADD, delta)), d, r);
 	return 1;
       }
     }
@@ -346,9 +357,11 @@ static void emit_call(ASMState *as, void *target)
       *p = ARMY_B(ARMI_BLX, (uint32_t)(delta>>2)) | ((delta&2) << 27);
     else
       *p = ARMY_B(ARMI_BL, (uint32_t)(delta>>2));
+  _glob++;
   } else {  /* Target out of range: need indirect call. But don't use R0-R3. */
     Reg r = ra_allock(as, i32ptr(target), RSET_RANGE(RID_R4, RID_R12+1));
     *p = ARMY_M3(ARMI_BLXr, r);
+  _glob++;
   }
 }
 
@@ -368,12 +381,13 @@ static void emit_movrr(ASMState *as, IRIns *ir, Reg dst, Reg src)
 #endif
   if (as->mcp != as->mcloop) {  /* Swap early registers for loads/stores. */
     MCode ins = *as->mcp, swp = (src^dst);
-    if ((ins & 0x0c000000) == 0x04000000 && (ins & 0x02000010) != 0x02000010) {
-      if (!((ins ^ (dst << 16)) & 0x000f0000))
-	*as->mcp = ins ^ (swp << 16);  /* Swap N in load/store. */
-      if (!(ins & 0x00100000) && !((ins ^ (dst << 12)) & 0x0000f000))
-	*as->mcp = ins ^ (swp << 12);  /* Swap D in store. */
-    }
+    // TODO
+ //    if ((ins & 0x0c000000) == 0x04000000 && (ins & 0x02000010) != 0x02000010) {
+ //      if (!((ins ^ (dst << 16)) & 0x000f0000))
+	// *as->mcp = ins ^ (swp << 16);  /* Swap N in load/store. */
+ //      if (!(ins & 0x00100000) && !((ins ^ (dst << 12)) & 0x0000f000))
+	// *as->mcp = ins ^ (swp << 12);  /* Swap D in store. */
+ //    }
   }
   emit_dm2(as, ARMI_MOV, dst, src);
 }

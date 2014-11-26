@@ -150,8 +150,8 @@ typedef struct {
 #define ARMF_S(r)	((r) << 8)
 #define ARMF_M(r)	((r) << 8)
 #define ARMF_M2(r) ((r) << 16) // MOV
-#define ARMF_M3(r) ((r) << 20) // BLXr
-#define ARMF_SH(sh, n)	(((sh) << 5) | ((n) << 7))
+#define ARMF_M3(r) ((r) << 19) // BLXr
+#define ARMF_SH(sh, n)	(((sh) << 20) | (((n) & 0x3) << 22) | ((((n) >> 2) & 0x7) << 28))
 #define ARMF_RSH(sh, r)	(0x10 | ((sh) << 5) | ARMF_S(r))
 
 /* Instruction compositing */
@@ -183,12 +183,12 @@ typedef enum ARMIns {
 
   // 11110H00000snnnn0HHHddddHHHHHHHH
   // 11101010000snnnn0iiiddddiiTTmmmm
-  ARMI_AND = ARMY_NODEF,
+  ARMI_AND = 0x0000f000,
   // ARMI_AND = 0xe0000000,
   
   // 11110H00100snnnn0HHHddddHHHHHHHH
   // 11101010100snnnn0iiiddddiiTTmmmm
-  ARMI_EOR = ARMY_NODEF,
+  ARMI_EOR = 0x0000f080,
   // ARMI_EOR = 0xe0200000,
   
   // 11110H01101snnnn0HHHddddHHHHHHHH
@@ -198,7 +198,7 @@ typedef enum ARMIns {
 
   // 11110H01110snnnn0HHHddddHHHHHHHH
   // 11101011110snnnn0iiiddddiiTTmmmm
-  ARMI_RSB = ARMY_NODEF,
+  ARMI_RSB = ARMY_NODEF-5,
   // ARMI_RSB = 0xe0600000,
   
   // 11110H01000snnnn0HHHddddHHHHHHHH
@@ -228,7 +228,7 @@ typedef enum ARMIns {
 
   // 11110H001001nnnn0HHH1111HHHHHHHH
   // 111010101001nnnn0iii1111iiTTmmmm
-  ARMI_TEQ = ARMY_NODEF,
+  ARMI_TEQ = 0x0f00ea90,
   // ARMI_TEQ = 0xe1300000,
 
   // 11110H011011nnnn0HHH1111HHHHHHHH
@@ -273,7 +273,7 @@ typedef enum ARMIns {
 
   // -
   // 111110111000nnnnllllhhhh0000mmmm
-  ARMI_SMULL = ARMY_NODEF,
+  ARMI_SMULL = 0x0000fb80,
   // ARMI_SMULL = 0xe0c00090,
 
   // tL:111110001101nnnnttttiiiiiiiiiiii
