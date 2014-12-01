@@ -159,7 +159,8 @@ typedef struct {
 #define ARMY_K12(A, B) ((A^ARMI_K12)|(((B)&0xff)<<16)|(((B)&0x700)<<20)|(((B)&0x800)>>1))
 #define ARMY_K12_BARE(A, B) ((A)|(((B)&0xff)<<16)|(((B)&0x700)<<20)|(((B)&0x800)>>1))
 #define ARMY_OP_BODY(A, B) ((A)^(B))
-#define ARMY_B(A, B) ((A)|(ARMY_SUB(B,0,10)<<17)|ARMY_SUB(B,10,10)|(ARMY_SUB(B,20,1)<<28)|(ARMY_SUB(B,21,1)<<29)|(ARMY_SUB(B,22,1)<<10))
+#define ARMY_B(A, B) ((A)|(ARMY_SUB(B,0,10)<<17)|ARMY_SUB(B,10,10)|(ARMY_SUB(B,20,1)<<27)|(ARMY_SUB(B,21,1)<<29)|(ARMY_SUB(B,22,1)<<10))
+#define ARMY_B_READ(B) (((-ARMY_SUB(B,10,1)) & ~((1<<22)-1))|((((ARMY_SUB(B,16,11)<<0)|(ARMY_SUB(B,0,10)<<11)|(ARMY_SUB(B,27,1)<<21)|(ARMY_SUB(B,29,1)<<22)))>>1))
 
 #define ARMY_NODEF 0xffffffff
 
@@ -250,6 +251,7 @@ typedef enum ARMIns {
   // 11110H00010s11110HHHddddHHHHHHHH
   // 11101010010s11110000dddd0000mmmm
   ARMI_MOV = 0x0000ea4f,
+  ARMI_MOVi = 0x0000f04f,
   // ARMI_MOV = 0xe1a00000,
 
   // 11110H00001snnnn0HHHddddHHHHHHHH

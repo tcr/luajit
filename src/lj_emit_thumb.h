@@ -258,7 +258,7 @@ static void emit_loadi(ASMState *as, Reg r, int32_t i)
   lua_assert(rset_test(as->freeset, r) || r == RID_TMP);
   if (k) {
     /* Standard K12 constant. */
-    emit_d(as, ARMI_MOV ^ emit_isthumb(ARMI_MOV, i), r);
+    emit_d(as, ARMI_MOVi ^ emit_isthumb(ARMI_MOVi, i), r);
   } else if ((as->flags & JIT_F_ARMV6T2) && (uint32_t)i < 0x00010000u) {
     /* 16 bit loword constant for ARMv6T2. */
     emit_d(as, ARMY_MOVTW(ARMI_MOVW, i), r);

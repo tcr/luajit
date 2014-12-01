@@ -19,6 +19,7 @@
 // P U W and I flags
 #define ARMY_FLAG(A, B) ((A)|(B))
 // rd rn regs
+#define ARMY_DN(ai, rd, rn) ((ai) | ARMF_D(rd) | ARMF_N(rn))
 #define ARMY_D_N(A, B, C) ((A)|(B)|(C))
 // ldr/str checks
 #define ARMY_ISVFP(A) ((A)&0x08000000)
@@ -127,7 +128,7 @@ static MCode *asm_exitstub_gen(ASMState *as, ExitNo group)
   lj_mcode_commitbot(as->J, mxp);
   as->mcbot = mxp;
   as->mclim = as->mcbot + MCLIM_REDZONE;
-  return mxp - EXITSTUBS_PER_GROUP;
+  return mxp - EXITSTUBS_PER_GROUP + 1;
 }
 
 /* Setup all needed exit stubs. */
@@ -2210,6 +2211,21 @@ static RegSet asm_head_side_base(ASMState *as, IRIns *irp, RegSet allow)
 
 /* -- Tail of trace ------------------------------------------------------- */
 
+static MCode* state_ = NULL;
+
+static MCode* exit_trampoline(void)
+{
+  if (state_ == NULL) {
+    MCode* target = (MCode *)lj_vm_exit_interp;
+    state_ = (MCode*) malloc(16);
+    state_[0] = ARMY_D(ARMY_MOVTW(ARMI_MOVW, ((uint32_t) target) & 0xFFFF), RID_TMP);
+    state_[1] = ARMY_D(ARMY_MOVTW(ARMI_MOVT, ((uint32_t) target) >> 16), RID_TMP);
+    state_[2] = ARMY_M3(ARMI_BLXr, RID_TMP);
+    state_[3] = 0xffffffffu;
+  }
+  return state_+1;
+}
+
 /* Fixup the tail code. */
 static void asm_tail_fixup(ASMState *as, TraceNo lnk)
 {
@@ -2222,11 +2238,19 @@ static void asm_tail_fixup(ASMState *as, TraceNo lnk)
     /* Patch stack adjustment. */
     uint32_t k = emit_isk12(ARMI_ADD, spadj);
     lua_assert(k);
-    p[-2] = ARMY_D_N(ARMY_OP_BODY(ARMI_ADD, k), ARMF_D(RID_SP), ARMF_N(RID_SP));
+    p[-2] = ARMY_DN(ARMY_OP_BODY(ARMI_ADD, emit_isthumb(ARMI_ADD, spadj)), RID_SP, RID_SP);
   }
   /* Patch exit branch. */
-  target = lnk ? traceref(as->J, lnk)->mcode : (MCode *)lj_vm_exit_interp;
-  p[-1] = ARMY_B(ARMI_B, (target-p)-1);
+  if (lnk) {
+    target = traceref(as->J, lnk)->mcode;
+  } else {
+    target = exit_trampoline();
+  }
+  p[-1] = ARMY_B(ARMI_BL, (target-p)-1);
+// target = (MCode *)lj_vm_exit_interp;
+// // p[-3] = ARMY_D(ARMY_MOVTW(ARMI_MOVT, ((uint32_t) target) >> 16), RID_TMP);
+// // p[-2] = ARMY_D(ARMY_MOVTW(ARMI_MOVW, ((uint32_t) target) & 0xFFFF), RID_TMP);
+// p[-1] = ARMY_B(ARMI_BLXr, RID_TMP);
 }
 
 /* Prepare tail of code. */
@@ -2423,11 +2447,13 @@ void lj_asm_patchexit(jit_State *J, GCtrace *T, ExitNo exitno, MCode *target)
   MCode *cstart = NULL, *cend = p;
   MCode *mcarea = lj_mcode_patch(J, p, 0);
   MCode *px = exitstub_addr(J, exitno) - 2;
+
   for (; p < pe; p++) {
     /* Look for bl_cc exitstub, replace with b_cc target. */
     uint32_t ins = *p;
-    if ((ins & 0xf800f000u) == 0xf800f000u) {
+    if ((ins & 0xf800f000u) == 0xf800f000u && (ARMY_B_READ(*p) ^ (px-p)) == 0) {
       *p = ARMY_B(ARMI_BL, target-p-2);
+      MCode *bad = ARMY_B_READ(*p);
       cend = p+1;
       if (!cstart) cstart = p;
     }
