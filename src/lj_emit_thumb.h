@@ -47,6 +47,10 @@ static uint32_t emit_invai[16] = {
 /* Encode constant in K12 format for data processing instructions. */
 static uint32_t emit_isk12(ARMIns ai, int32_t n)
 {
+  if (n > 0x7fff0000 || -n > 0x7fff0000) {
+    // TODO not hardcode, but fix instead
+    return 0;
+  }
   uint32_t invai, i, m = (uint32_t)n;
   /* K12: unsigned 8 bit value, rotated in steps of one bit. */
   for (i = 0; i < 4096; i += 128, m = lj_rol(m, 1))
@@ -71,6 +75,10 @@ static uint32_t emit_isk12(ARMIns ai, int32_t n)
 /* Encode constant in Thumb format for data processing instructions. */
 static uint32_t emit_isthumb(ARMIns ai, int32_t n)
 {
+  if (n > 0x7fff0000 || -n > 0x7fff0000) {
+    // TODO not hardcode, but fix instead
+    return 0;
+  }
   uint32_t invai, i, m = (uint32_t)n;
   /* K12: unsigned 8 bit value, rotated in steps of one bit. */
   if (n > 0) {
@@ -81,7 +89,8 @@ static uint32_t emit_isthumb(ARMIns ai, int32_t n)
       }
   }
   /* Otherwise try negation/complement with the inverse instruction. */
-  invai = emit_invai[(ai >> 5) & 0xf];
+  if (ai == ARMI_MOVi) invai = ai^ARMI_MVNi; // TODO NOT THIS
+  else invai = emit_invai[(ai >> 5) & 0xf];
   if (!invai) return 0;  /* Failed. No inverse instruction. */
   m = ~(uint32_t)n;
   if (invai == ((ARMI_SUB^ARMI_ADD) & INVAI_MASK) ||

@@ -565,7 +565,7 @@ static void asm_retf(ASMState *as, IRIns *ir)
   emit_setgl(as, base, jit_base);
   emit_addptr(as, base, -8*delta);
   asm_guardcc(as, CC_NE);
-  emit_nm(as, ARMI_CMP, RID_TMP,
+  emit_nm2(as, ARMI_CMPr, RID_TMP,
 	  ra_allock(as, i32ptr(pc), rset_exclude(RSET_GPR, base)));
   emit_lso(as, ARMI_LDR, RID_TMP, base, -4);
 }
@@ -817,16 +817,17 @@ static void asm_aref(ASMState *as, IRIns *ir)
     IRRef tab = IR(ir->op1)->op1;
     int32_t ofs = asm_fuseabase(as, tab);
     IRRef refa = ofs ? tab : ir->op1;
-    uint32_t k = emit_isk12(ARMI_ADD, ofs + 8*IR(ir->op2)->i);
+    uint32_t k = emit_isk12(ARMI_ADDi, ofs + 8*IR(ir->op2)->i);
     if (k) {
       base = ra_alloc1(as, refa, RSET_GPR);
-      emit_dn(as, ARMY_OP_BODY(ARMI_ADD, k), dest, base);
+      k = emit_isthumb(ARMI_ADDi, ofs + 8*IR(ir->op2)->i);
+      emit_dn(as, ARMY_OP_BODY(ARMI_ADDi, k), dest, base);
       return;
     }
   }
   base = ra_alloc1(as, ir->op1, RSET_GPR);
   idx = ra_alloc1(as, ir->op2, rset_exclude(RSET_GPR, base));
-  emit_dnm(as, ARMY_SH(ARMI_ADD, ARMSH_LSL, 3), dest, base, idx);
+  emit_dnm2(as, ARMY_SH(ARMI_ADDr, ARMSH_LSL, 3), dest, base, idx);
 }
 
 /* Inlined hash lookup. Specialized for key type and for const keys.
@@ -2244,9 +2245,10 @@ static void asm_tail_fixup(ASMState *as, TraceNo lnk)
   if (lnk) {
     target = traceref(as->J, lnk)->mcode;
   } else {
-    target = exit_trampoline();
+    target = exit_trampoline()-1;
   }
-  p[-1] = ARMY_B(ARMI_BL, (target-p)-1);
+  p[-1] = ARMY_B(ARMI_BL, (target-p));
+  _glob++;
 // target = (MCode *)lj_vm_exit_interp;
 // // p[-3] = ARMY_D(ARMY_MOVTW(ARMI_MOVT, ((uint32_t) target) >> 16), RID_TMP);
 // // p[-2] = ARMY_D(ARMY_MOVTW(ARMI_MOVW, ((uint32_t) target) & 0xFFFF), RID_TMP);
@@ -2452,7 +2454,7 @@ void lj_asm_patchexit(jit_State *J, GCtrace *T, ExitNo exitno, MCode *target)
     /* Look for bl_cc exitstub, replace with b_cc target. */
     uint32_t ins = *p;
     if ((ins & 0xf800f000u) == 0xf800f000u && (ARMY_B_READ(*p) ^ (px-p)) == 0) {
-      *p = ARMY_B(ARMI_BL, target-p-2);
+      *p = ARMY_B(ARMI_BL, target-p-1);
       MCode *bad = ARMY_B_READ(*p);
       cend = p+1;
       if (!cstart) cstart = p;
