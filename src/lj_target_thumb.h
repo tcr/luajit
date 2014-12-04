@@ -235,7 +235,7 @@ typedef enum ARMIns {
 
   // 11110H011011nnnn0HHH1111HHHHHHHH
   // 111010111011nnnn0iii1111iiTTmmmm
-  ARMI_CMP = 0x0f00f1b0,
+  ARMI_CMPi = 0x0f00f1b0,
   ARMI_CMPr = 0x0f00ebb0,
   // ARMI_CMP = 0xe1500000,
   

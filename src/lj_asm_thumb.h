@@ -744,7 +744,7 @@ static void asm_strto(ASMState *as, IRIns *ir)
   if (destused)
     emit_vlso(as, ARMI_VLDR_D, rlo, RID_SP, 0);
 #endif
-  emit_n(as, ARMY_K12(ARMI_CMP, 0), RID_RET);  /* Test return status. */
+  emit_n(as, ARMY_K12(ARMI_CMPi, 0), RID_RET);  /* Test return status. */
   args[0] = ir->op1;      /* GCstr *str */
   args[1] = ASMREF_TMP1;  /* TValue *n  */
   asm_gencall(as, ci, args);
@@ -848,7 +848,7 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
   IRRef refkey = ir->op2;
   IRIns *irkey = IR(refkey);
   IRType1 kt = irkey->t;
-  int32_t k = 0, khi = emit_isk12(ARMI_CMP, irt_toitype(kt));
+  int32_t k = 0, khi = emit_isk12(ARMI_CMPi, irt_toitype(kt));
   uint32_t khash;
   MCLabel l_end, l_loop;
   rset_clear(allow, tab);
@@ -881,19 +881,19 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
 #endif
   } else if (irt_isnum(kt)) {
     int32_t val = (int32_t)ir_knum(irkey)->u32.lo;
-    k = emit_isk12(ARMI_CMP, val);
+    k = emit_isk12(ARMI_CMPi, val);
     if (!k) {
       key = ra_allock(as, val, allow);
       rset_clear(allow, key);
     }
     val = (int32_t)ir_knum(irkey)->u32.hi;
-    khi = emit_isk12(ARMI_CMP, val);
+    khi = emit_isk12(ARMI_CMPi, val);
     if (!khi) {
       keyhi = ra_allock(as, val, allow);
       rset_clear(allow, keyhi);
     }
   } else if (!irt_ispri(kt)) {
-    k = emit_isk12(ARMI_CMP, irkey->i);
+    k = emit_isk12(ARMI_CMPi, irkey->i);
     if (!k) {
       key = ra_alloc1(as, refkey, allow);
       rset_clear(allow, key);
@@ -912,7 +912,7 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
 
   /* Follow hash chain until the end. */
   l_loop = --as->mcp;
-  emit_n(as, ARMY_K12(ARMI_CMP, 0), dest);
+  emit_n(as, ARMY_K12(ARMI_CMPi, 0), dest);
   emit_lso(as, ARMI_LDR, dest, dest, (int32_t)offsetof(Node, next));
 
   /* Type and value comparison. */
@@ -923,11 +923,11 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
     ARMY_IT(CC_EQ);
   }
   if (!irt_ispri(kt)) {
-    emit_nm(as, ARMY_OP_BODY(ARMF_CC(ARMI_CMP, CC_EQ), k), tmp, key);
-    emit_nm(as, ARMY_OP_BODY(ARMI_CMP, khi), tmp+1, keyhi);
+    emit_nm(as, ARMY_OP_BODY(ARMF_CC(ARMI_CMPi, CC_EQ), k), tmp, key);
+    emit_nm(as, ARMY_OP_BODY(ARMI_CMPi, khi), tmp+1, keyhi);
     emit_lsox(as, ARMI_LDRD, tmp, dest, (int32_t)offsetof(Node, key));
   } else {
-    emit_n(as, ARMY_OP_BODY(ARMI_CMP, khi), tmp);
+    emit_n(as, ARMY_OP_BODY(ARMI_CMPi, khi), tmp);
     emit_lso(as, ARMI_LDR, tmp, dest, (int32_t)offsetof(Node, key.it));
   }
   *l_loop = ARMY_B(ARMY_CCB(ARMI_B, CC_NE), as->mcp-l_loop-2);
@@ -1015,14 +1015,14 @@ static void asm_hrefk(ASMState *as, IRIns *ir)
   }
   rset_clear(allow, type);
   if (irt_isnum(irkey->t)) {
-    emit_opk(as, ARMY_CCB(ARMI_CMP, CC_EQ), 0, type,
+    emit_opk(as, ARMY_CCB(ARMI_CMPi, CC_EQ), 0, type,
 	     (int32_t)ir_knum(irkey)->u32.hi, allow);
     ARMY_IT(CC_EQ);
-    emit_opk(as, ARMI_CMP, 0, key,
+    emit_opk(as, ARMI_CMPi, 0, key,
 	     (int32_t)ir_knum(irkey)->u32.lo, allow);
   } else {
     if (ra_hasreg(key)) {
-      emit_opkthumb(as, ARMY_CCB(ARMI_CMP, CC_EQ), ARMY_CCB(ARMI_CMPr, CC_EQ), 0, key, irkey->i, allow);
+      emit_opkthumb(as, ARMY_CCB(ARMI_CMPi, CC_EQ), ARMY_CCB(ARMI_CMPr, CC_EQ), 0, key, irkey->i, allow);
       ARMY_IT(CC_EQ);
     }
     emit_n(as, ARMY_K12(ARMI_CMN, -irt_toitype(irkey->t)), type);
@@ -1060,7 +1060,7 @@ static void asm_uref(ASMState *as, IRIns *ir)
     Reg func = ra_alloc1(as, ir->op1, RSET_GPR);
     if (ir->o == IR_UREFC) {
       asm_guardcc(as, CC_NE);
-      emit_n(as, ARMY_K12(ARMI_CMP, 1), RID_TMP);
+      emit_n(as, ARMY_K12(ARMI_CMPi, 1), RID_TMP);
       emit_opk(as, ARMI_ADD, dest, uv,
 	       (int32_t)offsetof(GCupval, tv), RSET_GPR);
       emit_lso(as, ARMI_LDRB, RID_TMP, uv, (int32_t)offsetof(GCupval, closed));
@@ -1712,7 +1712,7 @@ static void asm_intmin_max(ASMState *as, IRIns *ir, int cc)
   Reg left = ra_hintalloc(as, ir->op1, dest, RSET_GPR);
   Reg right = 0;
   if (irref_isk(ir->op2)) {
-    kcmp = emit_isk12(ARMI_CMP, IR(ir->op2)->i);
+    kcmp = emit_isk12(ARMI_CMPi, IR(ir->op2)->i);
     if (kcmp) kmov = emit_isk12(ARMI_MOV, IR(ir->op2)->i);
   }
   if (!kmov) {
@@ -1726,7 +1726,7 @@ static void asm_intmin_max(ASMState *as, IRIns *ir, int cc)
     cc ^= (CC_LT^CC_GT);  /* Otherwise may swap CC_LT <-> CC_GT. */
   }
   if (dest != left) emit_dm(as, ARMF_CC(ARMI_MOV, cc), dest, left);
-  emit_nm(as, ARMY_OP_BODY(ARMI_CMP, kcmp), left, right);
+  emit_nm(as, ARMY_OP_BODY(ARMI_CMPi, kcmp), left, right);
 }
 
 #if LJ_SOFTFP
@@ -1887,7 +1887,7 @@ notst:
   //TODO need better way to check this out than this
   // because K12 may fail and then it would return a register
   // and that's bad news bears
-  ARMIns ai = asm_fuseopmthumb(as, ARMI_CMP, ARMI_CMPr, rref, rset_exclude(RSET_GPR, left));
+  ARMIns ai = asm_fuseopmthumb(as, ARMI_CMPi, ARMI_CMPr, rref, rset_exclude(RSET_GPR, left));
   asm_guardcc(as, cc);
   emit_n(as, ai, left);
   /* Signed comparison with zero and referencing previous ins? */
@@ -1909,28 +1909,28 @@ static void asm_int64comp(ASMState *as, IRIns *ir)
   cclo = asm_compmap[ir->o + (signedcomp ? 4 : 0)] & 15;
   leftlo = ra_alloc1(as, ir->op1, allow);
   oldfree = as->freeset;
-  mlo = asm_fuseopm(as, ARMI_CMP, ir->op2, rset_clear(allow, leftlo));
+  mlo = asm_fuseopm(as, ARMI_CMPr, ir->op2, rset_clear(allow, leftlo));
   allow &= ~(oldfree & ~as->freeset);  /* Update for allocs of asm_fuseopm. */
 
   /* Use signed or unsigned comparison for hiword. */
   cchi = asm_compmap[ir->o] & 15;
   lefthi = ra_alloc1(as, (ir+1)->op1, allow);
-  mhi = asm_fuseopm(as, ARMI_CMP, (ir+1)->op2, rset_clear(allow, lefthi));
+  mhi = asm_fuseopm(as, ARMI_CMPr, (ir+1)->op2, rset_clear(allow, lefthi));
 
   /* All register allocations must be performed _before_ this point. */
   if (signedcomp) {
     MCLabel l_around = emit_label(as);
     asm_guardcc(as, cclo);
-    emit_n(as, ARMY_OP_BODY(ARMI_CMP, mlo), leftlo);
+    emit_n(as, ARMY_OP_BODY(ARMI_CMPi, mlo), leftlo);
     emit_branch(as, ARMY_CCB(ARMI_B, CC_NE), l_around);
     ARMY_IT(CC_NE);
     if (cchi == CC_GE || cchi == CC_LE) cchi ^= 6;  /* GE -> GT, LE -> LT */
     asm_guardcc(as, cchi);
   } else {
     asm_guardcc(as, cclo);
-    emit_n(as, ARMY_OP_BODY(ARMF_CC(ARMI_CMP, CC_EQ), mlo), leftlo);
+    emit_n(as, ARMY_OP_BODY(ARMF_CC(ARMI_CMPi, CC_EQ), mlo), leftlo);
   }
-  emit_n(as, ARMY_OP_BODY(ARMI_CMP, mhi), lefthi);
+  emit_n(as, ARMY_OP_BODY(ARMI_CMPi, mhi), lefthi);
 }
 #endif
 
@@ -2044,7 +2044,7 @@ static void asm_stack_check(ASMState *as, BCReg topslot,
   ARMY_IT(CC_LS);
   k = emit_isk12(0, (int32_t)(8*topslot));
   lua_assert(k);
-  emit_n(as, ARMY_OP_BODY(ARMI_CMP, k), RID_TMP);
+  emit_n(as, ARMY_OP_BODY(ARMI_CMPi, k), RID_TMP);
   emit_dnm(as, ARMI_SUB, RID_TMP, RID_TMP, pbase);
   emit_lso(as, ARMI_LDR, RID_TMP, RID_TMP,
 	   (int32_t)offsetof(lua_State, maxstack));
@@ -2130,7 +2130,7 @@ static void asm_gc_check(ASMState *as)
   l_end = emit_label(as);
   /* Exit trace if in GCSatomic or GCSfinalize. Avoids syncing GC objects. */
   asm_guardcc(as, CC_NE);  /* Assumes asm_snap_prep() already done. */
-  emit_n(as, ARMY_K12(ARMI_CMP, 0), RID_RET);
+  emit_n(as, ARMY_K12(ARMI_CMPi, 0), RID_RET);
   args[0] = ASMREF_TMP1;  /* global_State *g */
   args[1] = ASMREF_TMP2;  /* MSize steps     */
   asm_gencall(as, ci, args);
@@ -2140,7 +2140,7 @@ static void asm_gc_check(ASMState *as)
   /* Jump around GC step if GC total < GC threshold. */
   emit_branch(as, ARMY_CCB(ARMI_B, CC_LS), l_end);
   ARMY_IT(CC_LS);
-  emit_nm(as, ARMI_CMP, RID_TMP, tmp2);
+  emit_nm(as, ARMI_CMPi, RID_TMP, tmp2);
   emit_lso(as, ARMI_LDR, tmp2, tmp1,
 	   (int32_t)offsetof(global_State, gc.threshold));
   emit_lso(as, ARMI_LDR, RID_TMP, tmp1,

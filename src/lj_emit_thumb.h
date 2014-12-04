@@ -63,7 +63,7 @@ static uint32_t emit_isk12(ARMIns ai, int32_t n)
   if (!invai) return 0;  /* Failed. No inverse instruction. */
   m = ~(uint32_t)n;
   if (invai == ((ARMI_SUB^ARMI_ADD) & INVAI_MASK) ||
-      invai == ((ARMI_CMP^ARMI_CMN) & INVAI_MASK)) m++;
+      invai == ((ARMI_CMPi^ARMI_CMN) & INVAI_MASK)) m++;
   for (i = 0; i < 4096; i += 128, m = lj_rol(m, 1))
     if (m <= 255) {
       if (m & 0x80 && i > 128*8) return ARMY_K12(invai, i|(m & 0x7f));
@@ -94,7 +94,7 @@ static uint32_t emit_isthumb(ARMIns ai, int32_t n)
   if (!invai) return 0;  /* Failed. No inverse instruction. */
   m = ~(uint32_t)n;
   if (invai == ((ARMI_SUB^ARMI_ADD) & INVAI_MASK) ||
-      invai == ((ARMI_CMP^ARMI_CMN) & INVAI_MASK)) m++;
+      invai == ((ARMI_CMPi^ARMI_CMN) & INVAI_MASK)) m++;
   for (i = 0; i < 4096; i += 128, m = lj_rol(m, 1))
     if (m <= 255) {
       if (m & 0x80 && i > 128*8) return ARMY_K12_BARE(invai, i|(m & 0x7f));
