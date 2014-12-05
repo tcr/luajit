@@ -209,7 +209,7 @@ typedef struct _Unwind_Context _Unwind_Context;
 #define _URC_CONTINUE_UNWIND	8
 #define _URC_FAILURE		9
 
-#if !LJ_TARGET_ARM
+#if !LJ_TARGET_ARM && !LJ_TARGET_THUMB
 
 extern uintptr_t _Unwind_GetCFA(_Unwind_Context *);
 extern void _Unwind_SetGR(_Unwind_Context *, int, uintptr_t);
