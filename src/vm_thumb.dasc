@@ -1083,7 +1083,7 @@ static void build_subroutines(BuildCtx *ctx)
   |   ldr CARG2, LFUNC:CARG3->tab
   |   cmp CARG2, #0
   |   bne >2
-  |  mov CARG2, #LJ_TNIL
+  |  mvn CARG2, #~LJ_TNIL
   |  b ->fff_restv
   |1:
 #endif
