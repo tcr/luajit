@@ -65,7 +65,7 @@ typedef void (LJ_FASTCALL *RecordFunc)(jit_State *J, RecordFFData *rd);
 /* Get runtime value of int argument. */
 static int32_t argv2int(jit_State *J, TValue *o)
 {
-  if (!lj_strscan_numberobj(J2L(J), o))
+  if (!lj_strscan_numberobj(J->L, o))
     lj_trace_err(J, LJ_TRERR_BADTYPE);
   return tvisint(o) ? intV(o) : lj_num2int(numV(o));
 }
