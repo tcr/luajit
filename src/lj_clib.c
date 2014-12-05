@@ -278,11 +278,22 @@ static void clib_unloadlib(CLibrary *cl)
   UNUSED(cl);
 }
 
+#if LJ_TARGET_THUMB
+
+static void *clib_getsym(CLibrary *cl, const char *name)
+{
+  void *p = lj_dlsym(cl->handle, name);
+  return p;
+}
+
+#else
+
 static void *clib_getsym(CLibrary *cl, const char *name)
 {
   UNUSED(cl); UNUSED(name);
   return NULL;
 }
+#endif
 
 #endif
 

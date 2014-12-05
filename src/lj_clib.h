@@ -24,6 +24,11 @@ LJ_FUNC void lj_clib_load(lua_State *L, GCtab *mt, GCstr *name, int global);
 LJ_FUNC void lj_clib_unload(CLibrary *cl);
 LJ_FUNC void lj_clib_default(lua_State *L, GCtab *mt);
 
+#if LJ_THUMB
+/* dlsym polyfill for Thumb. */
+void *lj_dlsym(void *handle, const char *name)
+#endif
+
 #endif
 
 #endif
