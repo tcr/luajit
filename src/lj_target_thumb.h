@@ -272,7 +272,7 @@ typedef enum ARMIns {
 
   // -
   // 111110110000nnnn1111dddd0000mmmm
-  ARMI_MUL = ARMY_NODEF,
+  ARMI_MUL = 0xf000fb00,
   // ARMI_MUL = 0xe0000090,
 
   // -
@@ -302,7 +302,8 @@ typedef enum ARMIns {
   // tL:111110000011nnnntttt1PUWiiiiiiii
   // tL:111110000011nnnntttt000000iimmmm
   // tB:11111000u0111111ttttiiiiiiiiiiii
-  ARMI_LDRH = ARMY_NODEF,
+  ARMI_LDRH = 0x0800f830,
+  ARMI_LDRHi = 0x0000f8b0,
   // ARMI_LDRH = 0xe01000b0,
 
   // tL:111110011001nnnnttttiiiiiiiiiiii

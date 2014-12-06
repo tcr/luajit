@@ -1585,7 +1585,7 @@ static void asm_intmul(ASMState *as, IRIns *ir)
     emit_dnm2(as, ARMY_MULL(ARMI_SMULL, dest), RID_TMP, left, right);
   } else {
     if (!(as->flags & JIT_F_ARMV6) && dest == left) tmp = left = RID_TMP;
-    emit_nm(as, ARMY_MULL(ARMI_MUL, right), dest, left);
+    emit_nm2(as, ARMY_MULL(ARMI_MUL, right), dest, left);
   }
   /* Only need this for the dest == left == right case. */
   if (ra_hasreg(tmp)) emit_dm(as, ARMI_MOV, tmp, right);
