@@ -81,7 +81,7 @@ static uint32_t emit_isthumb(ARMIns ai, int32_t n)
   }
   uint32_t invai, i, m = (uint32_t)n;
   /* K12: unsigned 8 bit value, rotated in steps of one bit. */
-  if (n > 0) {
+  if (n >= 0) {
     for (i = 0; i < 4096; i += 128, m = lj_rol(m, 1))
       if (m <= 255) {
         if (m & 0x80 && i > 128*8) return ARMY_K12_BARE(0, i|(m & 0x7f));

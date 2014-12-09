@@ -168,7 +168,7 @@ typedef enum ARMIns {
   ARMI_CCAL = 0xe0000000,
 
   // ARMI_S = 0x000100000,
-  ARMI_S = 0x00000001,
+  ARMI_S = 1 << 4,
 
   // ARMI_K12 = 0x02000000,
   ARMI_K12 = 0x00001a00,
@@ -195,6 +195,7 @@ typedef enum ARMIns {
   // 11110H01101snnnn0HHHddddHHHHHHHH
   // 11101011101snnnn0iiiddddiiTTmmmm
   ARMI_SUB = 0x0000f1a0,
+  ARMI_SUBr = 0x0000eba0,
   // ARMI_SUB = 0xe0400000,
 
   // 11110H01110snnnn0HHHddddHHHHHHHH

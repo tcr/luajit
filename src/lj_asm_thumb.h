@@ -1086,7 +1086,7 @@ static void asm_strref(ASMState *as, IRIns *ir)
   if (irref_isk(ref)) {
     IRRef tmp = refk; refk = ref; ref = tmp;
   } else if (!irref_isk(refk)) {
-    uint32_t k, m = ARMY_K12(0, sizeof(GCstr));
+    uint32_t k, m = ARMY_K12_BARE(0, sizeof(GCstr));
     Reg right, left = ra_alloc1(as, ir->op1, RSET_GPR);
     IRIns *irr = IR(ir->op2);
     if (ra_hasreg(irr->r)) {
@@ -1094,15 +1094,15 @@ static void asm_strref(ASMState *as, IRIns *ir)
       right = irr->r;
     } else if (mayfuse(as, irr->op2) &&
 	       irr->o == IR_ADD && irref_isk(irr->op2) &&
-	       (k = emit_isk12(ARMI_ADD,
+	       (k = emit_isthumb(ARMI_ADD,
 			       (int32_t)sizeof(GCstr) + IR(irr->op2)->i))) {
       m = k;
       right = ra_alloc1(as, irr->op1, rset_exclude(RSET_GPR, left));
     } else {
       right = ra_allocref(as, ir->op2, rset_exclude(RSET_GPR, left));
     }
-    emit_dn(as, ARMY_OP_BODY(ARMI_ADD, m), dest, dest);
-    emit_dnm(as, ARMI_ADD, dest, left, right);
+    emit_dn(as, ARMY_OP_BODY(ARMI_ADDi, m), dest, dest);
+    emit_dnm2(as, ARMI_ADDr, dest, left, right);
     return;
   }
   r = ra_alloc1(as, ref, RSET_GPR);
@@ -1520,7 +1520,7 @@ static void asm_intop(ASMState *as, IRIns *ir, ARMIns ai)
   ARMIns m = asm_fuseopmthumb(as, ai, ai^0x1a00, rref, rset_exclude(RSET_GPR, left));
   if (irt_isguard(ir->t)) {  /* For IR_ADDOV etc. */
     asm_guardcc(as, CC_VS);
-    // ai = ARMY_COND(ai);
+    ai = ARMY_COND(ai);
   }
   emit_dn(as, m, dest, left);
 }
@@ -1585,7 +1585,7 @@ static void asm_intmul(ASMState *as, IRIns *ir)
     emit_dnm2(as, ARMY_MULL(ARMI_SMULL, dest), RID_TMP, left, right);
   } else {
     if (!(as->flags & JIT_F_ARMV6) && dest == left) tmp = left = RID_TMP;
-    emit_nm2(as, ARMY_MULL(ARMI_MUL, right), dest, left);
+    emit_dnm2(as, ARMI_MUL, dest, left, right);
   }
   /* Only need this for the dest == left == right case. */
   if (ra_hasreg(tmp)) emit_dm(as, ARMI_MOV, tmp, right);
@@ -2045,8 +2045,8 @@ static void asm_stack_check(ASMState *as, BCReg topslot,
   k = emit_isk12(0, (int32_t)(8*topslot));
   lua_assert(k);
   emit_n(as, ARMY_OP_BODY(ARMI_CMPi, k), RID_TMP);
-  emit_dnm(as, ARMI_SUB, RID_TMP, RID_TMP, pbase);
-  emit_lso(as, ARMI_LDR, RID_TMP, RID_TMP,
+  emit_dnm(as, ARMI_SUBr, RID_TMP, RID_TMP, pbase);
+  emit_lso(as, ARMI_LDRi, RID_TMP, RID_TMP,
 	   (int32_t)offsetof(lua_State, maxstack));
   if (irp) {  /* Must not spill arbitrary registers in head of side trace. */
     int32_t i = i32ptr(&J2G(as->J)->jit_L);
@@ -2130,7 +2130,7 @@ static void asm_gc_check(ASMState *as)
   l_end = emit_label(as);
   /* Exit trace if in GCSatomic or GCSfinalize. Avoids syncing GC objects. */
   asm_guardcc(as, CC_NE);  /* Assumes asm_snap_prep() already done. */
-  emit_n(as, ARMY_K12(ARMI_CMPi, 0), RID_RET);
+  emit_n(as, ARMI_CMPi, RID_RET);
   args[0] = ASMREF_TMP1;  /* global_State *g */
   args[1] = ASMREF_TMP2;  /* MSize steps     */
   asm_gencall(as, ci, args);
