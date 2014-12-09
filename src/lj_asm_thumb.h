@@ -1505,6 +1505,13 @@ static void asm_bitop(ASMState *as, IRIns *ir, ARMIns ai)
   }
 }
 
+static void asm_intnegr(ASMState *as, IRIns *ir, ARMIns ai)
+{
+  Reg dest = ra_dest(as, ir, RSET_GPR);
+  Reg left = ra_hintalloc(as, ir->op1, dest, RSET_GPR);
+  emit_dn(as, ARMY_K12(ai, 0), left, dest);
+}
+
 static void asm_intneg(ASMState *as, IRIns *ir, ARMIns ai)
 {
   Reg dest = ra_dest(as, ir, RSET_GPR);
@@ -1929,8 +1936,7 @@ static void asm_hiop(ASMState *as, IRIns *ir)
     break;
   case IR_NEG:
     as->curins--;
-    // TODO fix this on thumb
-    asm_intneg(as, ir, ARMI_RSC);
+    asm_intnegr(as, ir, ARMI_SBC);
     asm_intneg(as, ir-1, ARMY_COND(ARMY_OPK(ARMI_RSB)));
     break;
 #endif
