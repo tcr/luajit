@@ -51,7 +51,7 @@ static MSize CALLBACK_OFS2SLOT(MSize ofs)
 #define CALLBACK_MAX_SLOT \
   (((CALLBACK_MCODE_SIZE-CALLBACK_MCODE_HEAD)/(CALLBACK_MCODE_GROUP+4*32))*32)
 
-#elif LJ_TARGET_ARM
+#elif LJ_TARGET_ARM || LJ_TARGET_THUMB
 
 #define CALLBACK_MCODE_HEAD		32
 #define CALLBACK_SLOT2OFS(slot)		(CALLBACK_MCODE_HEAD + 8*(slot))
@@ -135,7 +135,7 @@ static void callback_mcode_init(global_State *g, uint8_t *page)
   }
   lua_assert(p - page <= CALLBACK_MCODE_SIZE);
 }
-#elif LJ_TARGET_ARM
+#elif LJ_TARGET_ARM || LJ_TARGET_THUMB
 static void callback_mcode_init(global_State *g, uint32_t *page)
 {
   uint32_t *p = page;
@@ -308,7 +308,7 @@ void lj_ccallback_mcode_free(CTState *cts)
     } \
   }
 
-#elif LJ_TARGET_ARM
+#elif LJ_TARGET_ARM || LJ_TARGET_THUMB
 
 #if LJ_ABI_SOFTFP
 
@@ -414,7 +414,7 @@ static void callback_conv_args(CTState *cts, lua_State *L)
   MSize ngpr = 0, nsp = 0, maxgpr = CCALL_NARG_GPR;
 #if CCALL_NARG_FPR
   MSize nfpr = 0;
-#if LJ_TARGET_ARM
+#if LJ_TARGET_ARM || LJ_TARGET_THUMB
   MSize fprodd = 0;
 #endif
 #endif

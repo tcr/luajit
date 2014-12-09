@@ -34,7 +34,7 @@ CC= gcc
 # to slow down the C part by not omitting it. Debugging, tracebacks and
 # unwinding are not affected -- the assembler part has frame unwind
 # information and GCC emits it where needed (x64) or with -g (see CCDEBUG).
-CCOPT= -O2 -fomit-frame-pointer
+CCOPT= -O0 -fomit-frame-pointer
 # Use this if you want to generate a smaller binary (but it's slower):
 #CCOPT= -Os -fomit-frame-pointer
 # Note: it's no longer recommended to use -O3 with GCC 4.x.
@@ -72,10 +72,10 @@ CCWARN= -Wall
 # as dynamic mode.
 #
 # Mixed mode creates a static + dynamic library and a statically linked luajit.
-BUILDMODE= mixed
+#BUILDMODE= mixed
 #
 # Static mode creates a static library and a statically linked luajit.
-#BUILDMODE= static
+BUILDMODE= static
 #
 # Dynamic mode creates a dynamic library and a dynamically linked luajit.
 # Note: this executable will only run when the library is installed!
@@ -103,7 +103,7 @@ XCFLAGS=
 #XCFLAGS+= -DLUAJIT_ENABLE_LUA52COMPAT
 #
 # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
-#XCFLAGS+= -DLUAJIT_DISABLE_JIT
+# XCFLAGS+= -DLUAJIT_DISABLE_JIT
 #
 # Some architectures (e.g. PPC) can use either single-number (1) or
 # dual-number (2) mode. Uncomment one of these lines to override the
@@ -214,6 +214,9 @@ ifneq (,$(findstring LJ_TARGET_X64 ,$(TARGET_TESTARCH)))
 else
 ifneq (,$(findstring LJ_TARGET_X86 ,$(TARGET_TESTARCH)))
   TARGET_LJARCH= x86
+else
+ifneq (,$(findstring LJ_TARGET_THUMB ,$(TARGET_TESTARCH)))
+  TARGET_LJARCH= thumb
 else
 ifneq (,$(findstring LJ_TARGET_ARM ,$(TARGET_TESTARCH)))
   TARGET_LJARCH= arm
@@ -435,6 +438,7 @@ endif
 endif
 endif
 endif
+endif
 
 DASM_FLAGS= $(DASM_XFLAGS) $(DASM_AFLAGS)
 DASM_DASC= vm_$(DASM_ARCH).dasc
@@ -570,7 +574,13 @@ E= @echo
 # Make targets.
 ##############################################################################
 
-default all:	$(TARGET_T)
+ifeq (thumb,$(TARGET_LJARCH))
+	TARGET_Z=	$(TARGET_O)
+else
+	TARGET_Z=	$(TARGET_T)
+endif
+
+default all: $(TARGET_Z)
 
 amalg:
 	@grep "^[+|]" ljamalg.c
@@ -605,6 +615,10 @@ $(MINILUA_T): $(MINILUA_O)
 
 host/buildvm_arch.h: $(DASM_DASC) $(DASM_DEP)
 	$(E) "DYNASM    $@"
+	echo $(DASM)
+	echo $(DASM_FLAGS)
+	echo $@
+	echo $(DASM_DASC)
 	$(Q)$(DASM) $(DASM_FLAGS) -o $@ $(DASM_DASC)
 
 host/buildvm.o: $(DASM_DIR)/dasm_*.h

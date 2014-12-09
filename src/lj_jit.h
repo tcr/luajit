@@ -26,7 +26,7 @@
 /* Names for the CPU-specific flags. Must match the order above. */
 #define JIT_F_CPU_FIRST		JIT_F_CMOV
 #define JIT_F_CPUSTRING		"\4CMOV\4SSE2\4SSE3\6SSE4.1\2P4\3AMD\2K8\4ATOM"
-#elif LJ_TARGET_ARM
+#elif LJ_TARGET_ARM || LJ_TARGET_THUMB
 #define JIT_F_ARMV6_		0x00000010
 #define JIT_F_ARMV6T2_		0x00000020
 #define JIT_F_ARMV7		0x00000040
@@ -34,7 +34,7 @@
 #define JIT_F_VFPV3		0x00000100
 
 #define JIT_F_ARMV6		(JIT_F_ARMV6_|JIT_F_ARMV6T2_|JIT_F_ARMV7)
-#define JIT_F_ARMV6T2		(JIT_F_ARMV6T2_|JIT_F_ARMV7)
+#define JIT_F_ARMV6T2		(JIT_F_ARMV6T2_|JIT_F_ARMV7|LJ_TARGET_THUMB)
 #define JIT_F_VFP		(JIT_F_VFPV2|JIT_F_VFPV3)
 
 /* Names for the CPU-specific flags. Must match the order above. */

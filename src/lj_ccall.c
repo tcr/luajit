@@ -188,7 +188,7 @@
     } \
   }
 
-#elif LJ_TARGET_ARM
+#elif LJ_TARGET_ARM || LJ_TARGET_THUMB
 /* -- ARM calling conventions --------------------------------------------- */
 
 #if LJ_ABI_SOFTFP
