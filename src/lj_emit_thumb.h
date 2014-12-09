@@ -3,42 +3,25 @@
 ** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
 */
 
-// P U W and I flags
-#define ARMY_FLAG(A, B) ((A)|(B))
-#define ARMY_OFS(A, B) ((A)|((B)<<16))
-
-#define ARMY_DNM(ai, rd, rn, rm) ((ai) | ARMF_D(rd) | ARMF_N(rn) | ARMF_M(rm))
-#define ARMY_DNM2(ai, rd, rn, rm) ((ai) | ARMF_D(rd) | ARMF_N(rn) | ARMF_M2(rm))
-#define ARMY_DN(ai, rd, rn) ((ai) | ARMF_D(rd) | ARMF_N(rn))
-#define ARMY_TN(ai, rd, rn) ((ai) | ARMF_T(rd) | ARMF_N(rn))
-#define ARMY_DM(ai, rd, rm) ((ai) | ARMF_D(rd) | ARMF_M(rm))
-#define ARMY_DM2(ai, rd, rm) ((ai) | ARMF_D(rd) | ARMF_M2(rm))
-#define ARMY_NM(ai, rn, rm) ((ai) | ARMF_N(rn) | ARMF_M(rm))
-#define ARMY_NM2(ai, rn, rm) ((ai) | ARMF_N(rn) | ARMF_M2(rm))
-#define ARMY_D(ai, rd) ((ai) | ARMF_D(rd))
-#define ARMY_N(ai, rn) ((ai) | ARMF_N(rn))
-#define ARMY_M(ai, rm) ((ai) | ARMF_M(rm))
-#define ARMY_M3(ai, rm) ((ai) | ARMF_M3(rm))
-
 /* -- Constant encoding --------------------------------------------------- */
 
 #define INVAI_MASK 0xfbe0
 
 static uint32_t emit_invai[16] = {
-  /* AND, TST */ (ARMI_AND^ARMI_BIC) & INVAI_MASK,
-  /* BIC */ (ARMI_BIC^ARMI_AND) & INVAI_MASK,
-  /* MOV, ORR */ (ARMI_MOV^ARMI_MVN) & INVAI_MASK,
-  /* MVN, ORN */ (ARMI_MVN^ARMI_MOV) & INVAI_MASK,
+  /* AND, TST */ (ARMY_OPK(ARMI_AND)^ARMY_OPK(ARMI_BIC)) & INVAI_MASK,
+  /* BIC */ (ARMY_OPK(ARMI_BIC)^ARMY_OPK(ARMI_AND)) & INVAI_MASK,
+  /* MOV, ORR */ (ARMY_OPK(ARMI_MOV)^ARMY_OPK(ARMI_MVN)) & INVAI_MASK,
+  /* MVN, ORN */ (ARMY_OPK(ARMI_MVN)^ARMY_OPK(ARMI_MOV)) & INVAI_MASK,
   /* EOR, TEQ */ 0,
   0,
   0,
   0,
-  /* ADD, CMN */ (ARMI_ADD^ARMI_SUB) & INVAI_MASK,
+  /* ADD, CMN */ (ARMY_OPK(ARMI_ADD)^ARMY_OPK(ARMI_SUB)) & INVAI_MASK,
   0,
-  /* ADC */ (ARMI_ADC^ARMI_SBC) & INVAI_MASK,
-  /* SBC */ (ARMI_SBC^ARMI_ADC) & INVAI_MASK,
+  /* ADC */ (ARMY_OPK(ARMI_ADC)^ARMY_OPK(ARMI_SBC)) & INVAI_MASK,
+  /* SBC */ (ARMY_OPK(ARMI_SBC)^ARMY_OPK(ARMI_ADC)) & INVAI_MASK,
   0,
-  /* SUB, CMP */ (ARMI_SUB^ARMI_ADD) & INVAI_MASK,
+  /* SUB, CMP */ (ARMY_OPK(ARMI_SUB)^ARMY_OPK(ARMI_ADD)) & INVAI_MASK,
   /* RSB */ 0,
   0
   // /* RSC */ 0,
@@ -63,7 +46,7 @@ static uint32_t emit_isk12(ARMIns ai, int32_t n)
   if (!invai) return 0;  /* Failed. No inverse instruction. */
   m = ~(uint32_t)n;
   if (invai == ((ARMI_SUB^ARMI_ADD) & INVAI_MASK) ||
-      invai == ((ARMI_CMPi^ARMI_CMN) & INVAI_MASK)) m++;
+      invai == ((ARMI_CMP^ARMI_CMN) & INVAI_MASK)) m++;
   for (i = 0; i < 4096; i += 128, m = lj_rol(m, 1))
     if (m <= 255) {
       if (m & 0x80 && i > 128*8) return ARMY_K12(invai, i|(m & 0x7f));
@@ -89,12 +72,12 @@ static uint32_t emit_isthumb(ARMIns ai, int32_t n)
       }
   }
   /* Otherwise try negation/complement with the inverse instruction. */
-  if (ai == ARMI_MOVi) invai = ai^ARMI_MVNi; // TODO NOT THIS
+  if (ai == ARMY_OPK(ARMI_MOV)) invai = ai^ARMY_OPK(ARMI_MVN); // TODO NOT THIS
   else invai = emit_invai[(ai >> 5) & 0xf];
   if (!invai) return 0;  /* Failed. No inverse instruction. */
   m = ~(uint32_t)n;
-  if (invai == ((ARMI_SUB^ARMI_ADD) & INVAI_MASK) ||
-      invai == ((ARMI_CMPi^ARMI_CMN) & INVAI_MASK)) m++;
+  if (invai == ((ARMY_OPK(ARMI_SUB)^ARMY_OPK(ARMI_ADD)) & INVAI_MASK) ||
+      invai == ((ARMY_OPK(ARMI_CMP)^ARMY_OPK(ARMI_CMN)) & INVAI_MASK)) m++;
   for (i = 0; i < 4096; i += 128, m = lj_rol(m, 1))
     if (m <= 255) {
       if (m & 0x80 && i > 128*8) return ARMY_K12_BARE(invai, i|(m & 0x7f));
@@ -216,11 +199,11 @@ static int emit_kdelta1(ASMState *as, Reg d, int32_t i)
       int32_t delta = i - (ra_iskref(ref) ? ra_krefk(as, ref) : IR(ref)->i);
       uint32_t k = emit_isk12(ARMI_ADD, delta);
       if (k) {
-	if (k == ARMI_K12)
-	  emit_dm(as, ARMI_MOV, d, r);
-	else
-	  emit_dn(as, ARMY_OP_BODY(ARMI_ADD, emit_isthumb(ARMI_ADD, delta)), d, r);
-	return 1;
+        if (k == ARMI_K12)
+          emit_dm2(as, ARMI_MOV, d, r);
+        else
+	  emit_dn(as, ARMY_OP_BODY(ARMI_ADD, k), d, r);
+        return 1;
       }
     }
     rset_clear(work, r);
@@ -241,10 +224,10 @@ static int emit_kdelta2(ASMState *as, Reg d, int32_t i)
       if (other) {
 	int32_t delta = i - other;
 	uint32_t sh, inv = 0, k2, k;
-	if (delta < 0) { delta = -delta; inv = ARMI_ADD^ARMI_SUB; }
+	if (delta < 0) { delta = -delta; inv = ARMY_OPK(ARMI_ADD)^ARMY_OPK(ARMI_SUB); }
 	sh = lj_ffs(delta) & ~1;
-	k2 = emit_isthumb(0, delta & (255 << sh));
-	k = emit_isthumb(0, delta & ~(255 << sh));
+	k2 = emit_isk12(0, delta & (255 << sh));
+	k = emit_isk12(0, delta & ~(255 << sh));
 	if (k) {
 	  emit_dn(as, ARMY_OP_BODY(ARMI_ADD^inv, k2), d, d);
           uint32_t aop = ARMY_OP_BODY(ARMI_ADD^inv, k);
@@ -258,8 +241,6 @@ static int emit_kdelta2(ASMState *as, Reg d, int32_t i)
   return 0;  /* Failed. */
 }
 
-#define ARMY_MOVTW(A, K) (A | (ARMY_SUB(K, 0, 8) << 16) | (ARMY_SUB(K, 8, 3) << 28) | (ARMY_SUB(K, 11, 1) << 10) | (ARMY_SUB(K, 12, 4)))
-
 /* Load a 32 bit constant into a GPR. */
 static void emit_loadi(ASMState *as, Reg r, int32_t i)
 {
@@ -267,7 +248,7 @@ static void emit_loadi(ASMState *as, Reg r, int32_t i)
   lua_assert(rset_test(as->freeset, r) || r == RID_TMP);
   if (k) {
     /* Standard K12 constant. */
-    emit_d(as, ARMI_MOVi ^ emit_isthumb(ARMI_MOVi, i), r);
+    emit_d(as, ARMI_MOV ^ emit_isk12(ARMI_MOV, i), r);
   } else if ((as->flags & JIT_F_ARMV6T2) && (uint32_t)i < 0x00010000u) {
     /* 16 bit loword constant for ARMv6T2. */
     emit_d(as, ARMY_MOVTW(ARMI_MOVW, i), r);
@@ -287,10 +268,10 @@ static void emit_loadi(ASMState *as, Reg r, int32_t i)
       int32_t m = i & (255 << sh);
       i &= ~(255 << sh);
       if (i == 0) {
-	emit_d(as, ARMY_OP_BODY(ARMI_MOV, emit_isthumb(0, m)), r);
+	emit_d(as, ARMY_OP_BODY(ARMI_MOV, emit_isk12(0, m)), r);
 	break;
       }
-      emit_dn(as, ARMY_OP_BODY(ARMI_ORR, emit_isthumb(0, m)), r, r);
+      emit_dn(as, ARMY_OP_BODY(ARMI_ORR, emit_isk12(0, m)), r, r);
     }
   }
 }
@@ -389,8 +370,8 @@ static void emit_movrr(ASMState *as, IRIns *ir, Reg dst, Reg src)
   }
 #endif
   if (as->mcp != as->mcloop) {  /* Swap early registers for loads/stores. */
-    MCode ins = *as->mcp, swp = (src^dst);
     // TODO
+    // MCode ins = *as->mcp, swp = (src^dst);
  //    if ((ins & 0x0c000000) == 0x04000000 && (ins & 0x02000010) != 0x02000010) {
  //      if (!((ins ^ (dst << 16)) & 0x000f0000))
 	// *as->mcp = ins ^ (swp << 16);  /* Swap N in load/store. */
@@ -431,22 +412,11 @@ static void emit_spstore(ASMState *as, IRIns *ir, Reg r, int32_t ofs)
 static void emit_opk(ASMState *as, ARMIns ai, Reg dest, Reg src,
 		     int32_t i, RegSet allow)
 {
-  uint32_t k = emit_isthumb(ai, i);
+  uint32_t k = emit_isk12(ai, i);
   if (k)
     emit_dn(as, ARMY_OP_BODY(ai, k), dest, src);
   else
-    emit_dnm(as, ai, dest, src, ra_allock(as, i, allow));
-}
-
-/* Emit an arithmetic/logic operation with a constant operand. */
-static void emit_opkthumb(ASMState *as, ARMIns aik, ARMIns air, Reg dest, Reg src,
-                     int32_t i, RegSet allow)
-{
-  uint32_t k = emit_isthumb(aik, i);
-  if (k)
-    emit_dn(as, ARMY_OP_BODY(aik, k), dest, src);
-  else
-    emit_dnm2(as, air, dest, src, ra_allock(as, i, allow));
+    emit_dnm2(as, ai, dest, src, ra_allock(as, i, allow));
 }
 
 /* Add offset to pointer. */

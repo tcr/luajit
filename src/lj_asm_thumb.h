@@ -5,30 +5,6 @@
 
 /* -- Register allocator extensions --------------------------------------- */
 
-#define ARMY_IT(cc) *--as->mcp = 0xbf08bf00u | (((cc)&0xf) << 20)
-
-#define ARMY_SH(A, B, S) ((A)|(ARMF_SH(B, S)))
-#define ARMY_RSH(A, B, S) ((A)|(ARMF_RSH(B, S)))
-#define ARMY_COND(A) ((A)|(ARMI_S))
-#define ARMY_MULL(A, B) ((A)|(ARMF_T(B)))
-#define ARMY_IS(A, B) (((A) & ~ARMI_S) == (B))
-// reverse operand order
-#define ARMY_REVERSE(A) A ^= (ARMI_SUB)^(ARMI_RSB)
-// see if BODY has changed its op
-#define ARMY_MOD_OP(A) (A & ((ARMI_AND)^(ARMI_BIC)))
-// P U W and I flags
-#define ARMY_FLAG(A, B) ((A)|(B))
-// rd rn regs
-#define ARMY_DN(ai, rd, rn) ((ai) | ARMF_D(rd) | ARMF_N(rn))
-#define ARMY_D_N(A, B, C) ((A)|(B)|(C))
-// ldr/str checks
-#define ARMY_ISVFP(A) ((A)&0x08000000)
-#define ARMY_HWORD(A) ((A)&0x04000000)
-// CC
-#define ARMY_CC_IS(A) (((A))>>28)
-#define ARMY_CC_REPLACE(A, B, C) A ^= ((B^C) << 28)
-#define ARMY_CCB(A, B) (A)
-
 /* Allocate a register with a hint. */
 static Reg ra_hintalloc(ASMState *as, IRRef ref, Reg hint, RegSet allow)
 {
@@ -112,8 +88,8 @@ static MCode *asm_exitstub_gen(ASMState *as, ExitNo group)
   // *mxp = ARMY_B(ARMI_BL, ((MCode *)(void *)lj_vm_exit_handler-mxp)-2);
   
   /* str lr, [sp]; ldrt lr, [pc, 4]; blx lr .long vm_exit_handler; .long DISPATCH_address, group. */
-  *mxp++ = ARMY_D_N(ARMY_FLAG(ARMI_STR, ARMI_LS_P | ARMI_LS_U), ARMF_T(RID_LR), ARMF_N(RID_SP));
-  *mxp++ = ARMY_D_N(ARMI_LDRT, ARMF_T(RID_LR), ARMF_N(RID_PC))|(8<<16);
+  *mxp++ = ARMY_TN(ARMY_FLAG(ARMI_STR, ARMI_LS_P | ARMI_LS_U), RID_LR, RID_SP);
+  *mxp++ = ARMY_TN(ARMI_LDRT, RID_LR, RID_PC)|(8<<16);
   *mxp++ = ARMI_BLX | (RID_LR << 19);
   
   // mxp++;
@@ -236,7 +212,7 @@ static uint32_t asm_fuseopm(ASMState *as, ARMIns ai, IRRef ref, RegSet allow)
   } else if (irref_isk(ref)) {
     uint32_t k = emit_isk12(ai, ir->i);
     if (k)
-      return emit_isthumb(ai, ir->i);
+      return k;
   } else if (mayfuse(as, ref)) {
     if (ir->o >= IR_BSHL && ir->o <= IR_BROR) {
       Reg m = ra_alloc1(as, ir->op1, allow);
@@ -255,37 +231,6 @@ static uint32_t asm_fuseopm(ASMState *as, ARMIns ai, IRRef ref, RegSet allow)
     }
   }
   return ARMF_M2(ra_allocref(as, ref, allow));
-}
-
-/* Fuse m operand into arithmetic/logic instructions. */
-static uint32_t asm_fuseopmthumb(ASMState *as, ARMIns aik, ARMIns air, IRRef ref, RegSet allow)
-{
-  IRIns *ir = IR(ref);
-  if (ra_hasreg(ir->r)) {
-    ra_noweak(as, ir->r);
-    return ARMY_OP_BODY(air, ARMF_M2(ir->r));
-  } else if (irref_isk(ref)) {
-    uint32_t k = emit_isk12(aik, ir->i);
-    if (k)
-      return ARMY_OP_BODY(aik, emit_isthumb(aik, ir->i));
-  } else if (mayfuse(as, ref)) {
-    if (ir->o >= IR_BSHL && ir->o <= IR_BROR) {
-      Reg m = ra_alloc1(as, ir->op1, allow);
-      ARMShift sh = ir->o == IR_BSHL ? ARMSH_LSL :
-                    ir->o == IR_BSHR ? ARMSH_LSR :
-                    ir->o == IR_BSAR ? ARMSH_ASR : ARMSH_ROR;
-      if (irref_isk(ir->op2)) {
-        return ARMY_OP_BODY(air, ARMF_M2(m | ARMF_SH(sh, (IR(ir->op2)->i & 31))));
-      } else {
-        Reg s = ra_alloc1(as, ir->op2, rset_exclude(allow, m));
-        return ARMY_OP_BODY(air, ARMF_M2(m | ARMF_RSH(sh, s)));
-      }
-    } else if (ir->o == IR_ADD && ir->op1 == ir->op2) {
-      Reg m = ra_alloc1(as, ir->op1, allow);
-      return ARMY_OP_BODY(air, ARMF_M2(m | ARMF_SH(ARMSH_LSL, 1)));
-    }
-  }
-  return ARMY_OP_BODY(air, ARMF_M2(ra_allocref(as, ref, allow)));
 }
 
 /* Fuse shifts into loads/stores. Only bother with BSHL 2 => lsl #2. */
@@ -565,7 +510,7 @@ static void asm_retf(ASMState *as, IRIns *ir)
   emit_setgl(as, base, jit_base);
   emit_addptr(as, base, -8*delta);
   asm_guardcc(as, CC_NE);
-  emit_nm2(as, ARMI_CMPr, RID_TMP,
+  emit_nm2(as, ARMI_CMP, RID_TMP,
 	  ra_allock(as, i32ptr(pc), rset_exclude(RSET_GPR, base)));
   emit_lso(as, ARMI_LDR, RID_TMP, base, -4);
 }
@@ -654,12 +599,12 @@ static void asm_conv(ASMState *as, IRIns *ir)
 		    st == IRT_I16 ? ARMI_SXTH : ARMI_UXTH;
 	emit_dm(as, ai, dest, left);
       } else if (st == IRT_U8) {
-	emit_dn(as, ARMY_K12(ARMI_AND,255), dest, left);
+	emit_dn(as, ARMY_K12(ARMI_AND, 255), dest, left);
       } else {
 	uint32_t shift = st == IRT_I8 ? 24 : 16;
 	ARMShift sh = st == IRT_U16 ? ARMSH_LSR : ARMSH_ASR;
-	emit_dm(as, ARMY_SH(ARMI_MOV, sh, shift), dest, RID_TMP);
-	emit_dm(as, ARMY_SH(ARMI_MOV, ARMSH_LSL, shift), RID_TMP, left);
+	emit_dm2(as, ARMY_SH(ARMI_MOV, sh, shift), dest, RID_TMP);
+	emit_dm2(as, ARMY_SH(ARMI_MOV, ARMSH_LSL, shift), RID_TMP, left);
       }
     } else {  /* Handle 32/32 bit no-op (cast). */
       ra_leftov(as, dest, lref);  /* Do nothing, but may need to move regs. */
@@ -744,13 +689,13 @@ static void asm_strto(ASMState *as, IRIns *ir)
   if (destused)
     emit_vlso(as, ARMI_VLDR_D, rlo, RID_SP, 0);
 #endif
-  emit_n(as, ARMY_K12(ARMI_CMPi, 0), RID_RET);  /* Test return status. */
+  emit_n(as, ARMY_K12(ARMI_CMP, 0), RID_RET);  /* Test return status. */
   args[0] = ir->op1;      /* GCstr *str */
   args[1] = ASMREF_TMP1;  /* TValue *n  */
   asm_gencall(as, ci, args);
   tmp = ra_releasetmp(as, ASMREF_TMP1);
   if (ofs == 0)
-    emit_dm(as, ARMI_MOV, tmp, RID_SP);
+    emit_dm2(as, ARMI_MOV, tmp, RID_SP);
   else
     emit_opk(as, ARMI_ADD, tmp, RID_SP, ofs, RSET_GPR);
 }
@@ -817,17 +762,16 @@ static void asm_aref(ASMState *as, IRIns *ir)
     IRRef tab = IR(ir->op1)->op1;
     int32_t ofs = asm_fuseabase(as, tab);
     IRRef refa = ofs ? tab : ir->op1;
-    uint32_t k = emit_isk12(ARMI_ADDi, ofs + 8*IR(ir->op2)->i);
+    uint32_t k = emit_isk12(ARMY_OPK(ARMI_ADD), ofs + 8*IR(ir->op2)->i);
     if (k) {
       base = ra_alloc1(as, refa, RSET_GPR);
-      k = emit_isthumb(ARMI_ADDi, ofs + 8*IR(ir->op2)->i);
-      emit_dn(as, ARMY_OP_BODY(ARMI_ADDi, k), dest, base);
+      emit_dn(as, ARMY_OP_BODY(ARMI_ADD, k), dest, base);
       return;
     }
   }
   base = ra_alloc1(as, ir->op1, RSET_GPR);
   idx = ra_alloc1(as, ir->op2, rset_exclude(RSET_GPR, base));
-  emit_dnm2(as, ARMY_SH(ARMI_ADDr, ARMSH_LSL, 3), dest, base, idx);
+  emit_dnm2(as, ARMY_SH(ARMI_ADD, ARMSH_LSL, 3), dest, base, idx);
 }
 
 /* Inlined hash lookup. Specialized for key type and for const keys.
@@ -848,7 +792,7 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
   IRRef refkey = ir->op2;
   IRIns *irkey = IR(refkey);
   IRType1 kt = irkey->t;
-  int32_t k = 0, khi = emit_isk12(ARMI_CMPi, irt_toitype(kt));
+  int32_t k = 0, khi = emit_isk12(ARMY_OPK(ARMI_CMP), irt_toitype(kt));
   uint32_t khash;
   MCLabel l_end, l_loop;
   rset_clear(allow, tab);
@@ -881,19 +825,19 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
 #endif
   } else if (irt_isnum(kt)) {
     int32_t val = (int32_t)ir_knum(irkey)->u32.lo;
-    k = emit_isk12(ARMI_CMPi, val);
+    k = emit_isk12(ARMY_OPK(ARMI_CMP), val);
     if (!k) {
       key = ra_allock(as, val, allow);
       rset_clear(allow, key);
     }
     val = (int32_t)ir_knum(irkey)->u32.hi;
-    khi = emit_isk12(ARMI_CMPi, val);
+    khi = emit_isk12(ARMY_OPK(ARMI_CMP), val);
     if (!khi) {
       keyhi = ra_allock(as, val, allow);
       rset_clear(allow, keyhi);
     }
   } else if (!irt_ispri(kt)) {
-    k = emit_isk12(ARMI_CMPi, irkey->i);
+    k = emit_isk12(ARMY_OPK(ARMI_CMP), irkey->i);
     if (!k) {
       key = ra_alloc1(as, refkey, allow);
       rset_clear(allow, key);
@@ -912,7 +856,7 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
 
   /* Follow hash chain until the end. */
   l_loop = --as->mcp;
-  emit_n(as, ARMY_K12(ARMI_CMPi, 0), dest);
+  emit_n(as, ARMY_K12(ARMY_OPK(ARMI_CMP), 0), dest);
   emit_lso(as, ARMI_LDR, dest, dest, (int32_t)offsetof(Node, next));
 
   /* Type and value comparison. */
@@ -923,11 +867,11 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
     ARMY_IT(CC_EQ);
   }
   if (!irt_ispri(kt)) {
-    emit_nm(as, ARMY_OP_BODY(ARMF_CC(ARMI_CMPi, CC_EQ), k), tmp, key);
-    emit_nm(as, ARMY_OP_BODY(ARMI_CMPi, khi), tmp+1, keyhi);
+    emit_nm(as, ARMY_OP_BODY(ARMF_CC(ARMY_OPK(ARMI_CMP), CC_EQ), k), tmp, key);
+    emit_nm(as, ARMY_OP_BODY(ARMY_OPK(ARMI_CMP), khi), tmp+1, keyhi);
     emit_lsox(as, ARMI_LDRD, tmp, dest, (int32_t)offsetof(Node, key));
   } else {
-    emit_n(as, ARMY_OP_BODY(ARMI_CMPi, khi), tmp);
+    emit_n(as, ARMY_OP_BODY(ARMY_OPK(ARMI_CMP), khi), tmp);
     emit_lso(as, ARMI_LDR, tmp, dest, (int32_t)offsetof(Node, key.it));
   }
   *l_loop = ARMY_B(ARMY_CCB(ARMI_B, CC_NE), as->mcp-l_loop-2);
@@ -938,10 +882,10 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
   if (khash == 0) {
     emit_lso(as, ARMI_LDR, dest, tab, (int32_t)offsetof(GCtab, node));
   } else {
-    emit_dnm(as, ARMY_SH(ARMI_ADD, ARMSH_LSL, 3), dest, dest, tmp);
-    emit_dnm(as, ARMY_SH(ARMI_ADD, ARMSH_LSL, 1), tmp, tmp, tmp);
+    emit_dnm(as, ARMY_SH(ARMY_OPK(ARMI_ADD), ARMSH_LSL, 3), dest, dest, tmp);
+    emit_dnm(as, ARMY_SH(ARMY_OPK(ARMI_ADD), ARMSH_LSL, 1), tmp, tmp, tmp);
     if (irt_isstr(kt)) {  /* Fetch of str->hash is cheaper than ra_allock. */
-      emit_dnm(as, ARMI_AND, tmp, tmp+1, RID_TMP);
+      emit_dnm(as, ARMY_OPK(ARMI_AND), tmp, tmp+1, RID_TMP);
       emit_lso(as, ARMI_LDR, dest, tab, (int32_t)offsetof(GCtab, node));
       emit_lso(as, ARMI_LDR, tmp+1, key, (int32_t)offsetof(GCstr, hash));
       emit_lso(as, ARMI_LDR, RID_TMP, tab, (int32_t)offsetof(GCtab, hmask));
@@ -953,26 +897,26 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
     } else {  /* Must match with hash*() in lj_tab.c. */
       if (ra_hasreg(keynumhi)) {  /* Canonicalize +-0.0 to 0.0. */
 	if (keyhi == RID_TMP)
-	  emit_dm(as, ARMF_CC(ARMI_MOV, CC_NE), keyhi, keynumhi);
+	  emit_dm2(as, ARMF_CC(ARMI_MOV, CC_NE), keyhi, keynumhi);
 	emit_d(as, ARMY_K12(ARMF_CC(ARMI_MOV, CC_EQ), 0), keyhi);
       }
-      emit_dnm(as, ARMI_AND, tmp, tmp, RID_TMP);
-      emit_dnm(as, ARMY_SH(ARMI_SUB, ARMSH_ROR, 32-HASH_ROT3), tmp, tmp, tmp+1);
+      emit_dnm(as, ARMY_OPK(ARMI_AND), tmp, tmp, RID_TMP);
+      emit_dnm(as, ARMY_SH(ARMY_OPK(ARMI_SUB), ARMSH_ROR, 32-HASH_ROT3), tmp, tmp, tmp+1);
       emit_lso(as, ARMI_LDR, dest, tab, (int32_t)offsetof(GCtab, node));
-      emit_dnm(as, ARMY_SH(ARMI_EOR, ARMSH_ROR, 32-((HASH_ROT2+HASH_ROT1)&31)),
+      emit_dnm(as, ARMY_SH(ARMY_OPK(ARMI_EOR), ARMSH_ROR, 32-((HASH_ROT2+HASH_ROT1)&31)),
 	       tmp, tmp+1, tmp);
       emit_lso(as, ARMI_LDR, RID_TMP, tab, (int32_t)offsetof(GCtab, hmask));
-      emit_dnm(as, ARMY_SH(ARMI_SUB, ARMSH_ROR, 32-HASH_ROT1), tmp+1, tmp+1, tmp);
+      emit_dnm(as, ARMY_SH(ARMY_OPK(ARMI_SUB), ARMSH_ROR, 32-HASH_ROT1), tmp+1, tmp+1, tmp);
       if (ra_hasreg(keynumhi)) {
-	emit_dnm(as, ARMI_EOR, tmp+1, tmp, key);
+	emit_dnm(as, ARMY_OPK(ARMI_EOR), tmp+1, tmp, key);
 	emit_dnm(as, ARMY_COND(ARMI_ORR), RID_TMP, tmp, key);  /* Test for +-0.0. */
-	emit_dnm(as, ARMI_ADD, tmp, keynumhi, keynumhi);
+	emit_dnm(as, ARMY_OPK(ARMI_ADD), tmp, keynumhi, keynumhi);
 #if !LJ_SOFTFP
 	emit_dnm(as, ARMI_VMOV_RR_D, key, keynumhi,
 		 (ra_alloc1(as, refkey, RSET_FPR) & 15));
 #endif
       } else {
-	emit_dnm(as, ARMI_EOR, tmp+1, tmp, key);
+	emit_dnm(as, ARMY_OPK(ARMI_EOR), tmp+1, tmp, key);
 	emit_opk(as, ARMI_ADD, tmp, key, (int32_t)HASH_BIAS,
 		 rset_exclude(rset_exclude(RSET_GPR, tab), key));
       }
@@ -1015,14 +959,14 @@ static void asm_hrefk(ASMState *as, IRIns *ir)
   }
   rset_clear(allow, type);
   if (irt_isnum(irkey->t)) {
-    emit_opk(as, ARMY_CCB(ARMI_CMPi, CC_EQ), 0, type,
+    emit_opk(as, ARMY_CCB(ARMI_CMP, CC_EQ), 0, type,
 	     (int32_t)ir_knum(irkey)->u32.hi, allow);
     ARMY_IT(CC_EQ);
-    emit_opk(as, ARMI_CMPi, 0, key,
+    emit_opk(as, ARMI_CMP, 0, key,
 	     (int32_t)ir_knum(irkey)->u32.lo, allow);
   } else {
     if (ra_hasreg(key)) {
-      emit_opkthumb(as, ARMY_CCB(ARMI_CMPi, CC_EQ), ARMY_CCB(ARMI_CMPr, CC_EQ), 0, key, irkey->i, allow);
+      emit_opk(as, ARMY_CCB(ARMI_CMP, CC_EQ), 0, key, irkey->i, allow);
       ARMY_IT(CC_EQ);
     }
     emit_n(as, ARMY_K12(ARMI_CMN, -irt_toitype(irkey->t)), type);
@@ -1060,7 +1004,7 @@ static void asm_uref(ASMState *as, IRIns *ir)
     Reg func = ra_alloc1(as, ir->op1, RSET_GPR);
     if (ir->o == IR_UREFC) {
       asm_guardcc(as, CC_NE);
-      emit_n(as, ARMY_K12(ARMI_CMPi, 1), RID_TMP);
+      emit_n(as, ARMY_K12(ARMI_CMP, 1), RID_TMP);
       emit_opk(as, ARMI_ADD, dest, uv,
 	       (int32_t)offsetof(GCupval, tv), RSET_GPR);
       emit_lso(as, ARMI_LDRB, RID_TMP, uv, (int32_t)offsetof(GCupval, closed));
@@ -1086,7 +1030,7 @@ static void asm_strref(ASMState *as, IRIns *ir)
   if (irref_isk(ref)) {
     IRRef tmp = refk; refk = ref; ref = tmp;
   } else if (!irref_isk(refk)) {
-    uint32_t k, m = ARMY_K12_BARE(0, sizeof(GCstr));
+    uint32_t k, m = ARMY_K12(0, sizeof(GCstr));
     Reg right, left = ra_alloc1(as, ir->op1, RSET_GPR);
     IRIns *irr = IR(ir->op2);
     if (ra_hasreg(irr->r)) {
@@ -1094,15 +1038,15 @@ static void asm_strref(ASMState *as, IRIns *ir)
       right = irr->r;
     } else if (mayfuse(as, irr->op2) &&
 	       irr->o == IR_ADD && irref_isk(irr->op2) &&
-	       (k = emit_isthumb(ARMI_ADD,
+	       (k = emit_isk12(ARMI_ADD,
 			       (int32_t)sizeof(GCstr) + IR(irr->op2)->i))) {
       m = k;
       right = ra_alloc1(as, irr->op1, rset_exclude(RSET_GPR, left));
     } else {
       right = ra_allocref(as, ir->op2, rset_exclude(RSET_GPR, left));
     }
-    emit_dn(as, ARMY_OP_BODY(ARMI_ADDi, m), dest, dest);
-    emit_dnm2(as, ARMI_ADDr, dest, left, right);
+    emit_dn(as, ARMY_OP_BODY(ARMI_ADD, m), dest, dest);
+    emit_dnm2(as, ARMI_ADD, dest, left, right);
     return;
   }
   r = ra_alloc1(as, ref, RSET_GPR);
@@ -1145,7 +1089,7 @@ static void asm_fload(ASMState *as, IRIns *ir)
   if (ir->op2 == IRFL_TAB_ARRAY) {
     ofs = asm_fuseabase(as, ir->op1);
     if (ofs) {  /* Turn the t->array load into an add for colocated arrays. */
-      emit_dn(as, ARMY_K12(ARMI_ADD, ofs), dest, idx);
+      emit_dn(as, ARMY_K12(ARMY_OPK(ARMI_ADD), ofs), dest, idx);
       return;
     }
   }
@@ -1412,12 +1356,12 @@ static void asm_tbar(ASMState *as, IRIns *ir)
   emit_lso(as, ARMI_STRB, mark, tab, (int32_t)offsetof(GCtab, marked));
   emit_lso(as, ARMI_STR, tab, gr,
 	   (int32_t)offsetof(global_State, gc.grayagain));
-  emit_dn(as, ARMY_K12_BARE(ARMI_BIC, LJ_GC_BLACK), mark, mark);
+  emit_dn(as, ARMY_K12_BARE(ARMY_OPK(ARMI_BIC), LJ_GC_BLACK), mark, mark);
   emit_lso(as, ARMI_LDR, link, gr,
 	   (int32_t)offsetof(global_State, gc.grayagain));
   emit_branch(as, ARMY_CCB(ARMI_B, CC_EQ), l_end);
   ARMY_IT(CC_EQ);
-  emit_n(as, ARMY_K12_BARE(ARMI_TST, LJ_GC_BLACK), mark);
+  emit_n(as, ARMY_K12_BARE(ARMY_OPK(ARMI_TST), LJ_GC_BLACK), mark);
   emit_lso(as, ARMI_LDRB, mark, tab, (int32_t)offsetof(GCtab, marked));
 }
 
@@ -1443,8 +1387,8 @@ static void asm_obar(ASMState *as, IRIns *ir)
   ra_allockreg(as, i32ptr(J2G(as->J)), ra_releasetmp(as, ASMREF_TMP1));
   obj = IR(ir->op1)->r;
   tmp = ra_scratch(as, rset_exclude(RSET_GPR, obj));
-  emit_n(as, ARMY_K12(ARMF_CC(ARMI_TST, CC_NE), LJ_GC_BLACK), tmp);
-  emit_n(as, ARMY_K12(ARMI_TST, LJ_GC_WHITES), RID_TMP);
+  emit_n(as, ARMY_K12(ARMF_CC(ARMY_OPK(ARMI_TST), CC_NE), LJ_GC_BLACK), tmp);
+  emit_n(as, ARMY_K12(ARMY_OPK(ARMI_TST), LJ_GC_WHITES), RID_TMP);
   val = ra_alloc1(as, ir->op2, rset_exclude(RSET_GPR, obj));
   emit_lso(as, ARMI_LDRB, tmp, obj,
 	   (int32_t)offsetof(GCupval, marked)-(int32_t)offsetof(GCupval, tv));
@@ -1513,16 +1457,16 @@ static void asm_intop(ASMState *as, IRIns *ir, ARMIns ai)
   Reg left, dest = ra_dest(as, ir, RSET_GPR);
   if (asm_swapops(as, lref, rref)) {
     IRRef tmp = lref; lref = rref; rref = tmp;
-    if (ARMY_IS(ai, ARMI_SUB) || ARMY_IS(ai, ARMI_SBC))
+    if (ARMY_IS(ai, ARMY_OPK(ARMI_SUB)) || ARMY_IS(ai, ARMY_OPK(ARMI_SBC)))
       ARMY_REVERSE(ai);
   }
   left = ra_hintalloc(as, lref, dest, RSET_GPR);
-  ARMIns m = asm_fuseopmthumb(as, ai, ai^0x1a00, rref, rset_exclude(RSET_GPR, left));
+  uint32_t m = asm_fuseopm(as, ai, rref, rset_exclude(RSET_GPR, left));
   if (irt_isguard(ir->t)) {  /* For IR_ADDOV etc. */
     asm_guardcc(as, CC_VS);
     ai = ARMY_COND(ai);
   }
-  emit_dn(as, m, dest, left);
+  emit_dn(as, ARMY_OP_BODY(ai, m), dest, left);
 }
 
 static void asm_intop_s(ASMState *as, IRIns *ir, ARMIns ai)
@@ -1582,13 +1526,13 @@ static void asm_intmul(ASMState *as, IRIns *ir)
       tmp = left = ra_scratch(as, rset_exclude(RSET_GPR, left));
     asm_guardcc(as, CC_NE);
     emit_nm2(as, ARMY_SH(ARMI_TEQ, ARMSH_ASR, 31), RID_TMP, dest);
-    emit_dnm2(as, ARMY_MULL(ARMI_SMULL, dest), RID_TMP, left, right);
+    emit_dnm2(as, ARMY_T(ARMI_SMULL, dest), RID_TMP, left, right);
   } else {
     if (!(as->flags & JIT_F_ARMV6) && dest == left) tmp = left = RID_TMP;
     emit_dnm2(as, ARMI_MUL, dest, left, right);
   }
   /* Only need this for the dest == left == right case. */
-  if (ra_hasreg(tmp)) emit_dm(as, ARMI_MOV, tmp, right);
+  if (ra_hasreg(tmp)) emit_dm2(as, ARMI_MOV, tmp, right);
 }
 
 static void asm_add(ASMState *as, IRIns *ir)
@@ -1634,7 +1578,7 @@ static void asm_neg(ASMState *as, IRIns *ir)
     return;
   }
 #endif
-  asm_intneg(as, ir, ARMI_RSB);
+  asm_intneg(as, ir, ARMY_OPK(ARMI_RSB));
 }
 
 static void asm_callid(ASMState *as, IRIns *ir, IRCallID id)
@@ -1682,7 +1626,7 @@ static void asm_bitswap(ASMState *as, IRIns *ir)
     if (tmp2 == left)
       tmp2 = ra_scratch(as, rset_exclude(rset_exclude(RSET_GPR, dest), left));
     emit_dnm(as, ARMY_SH(ARMI_EOR, ARMSH_LSR, 8), dest, tmp2, RID_TMP);
-    emit_dm(as, ARMY_SH(ARMI_MOV, ARMSH_ROR, 8), tmp2, left);
+    emit_dm2(as, ARMY_SH(ARMI_MOV, ARMSH_ROR, 8), tmp2, left);
     emit_dn(as, ARMY_K12(ARMI_BIC, 256*8|255), RID_TMP, RID_TMP);
     emit_dnm(as, ARMY_SH(ARMI_EOR, ARMSH_ROR, 16), RID_TMP, left, left);
   }
@@ -1701,7 +1645,7 @@ static void asm_bitshift(ASMState *as, IRIns *ir, ARMShift sh)
     Reg dest = ra_dest(as, ir, RSET_GPR);
     Reg left = ra_alloc1(as, ir->op1, RSET_GPR);
     Reg right = ra_alloc1(as, ir->op2, rset_exclude(RSET_GPR, left));
-    emit_dm(as, ARMY_RSH(ARMI_MOV, sh, right), dest, left);
+    emit_dm2(as, ARMY_RSH(ARMI_MOV, sh, right), dest, left);
   }
 }
 
@@ -1712,7 +1656,7 @@ static void asm_intmin_max(ASMState *as, IRIns *ir, int cc)
   Reg left = ra_hintalloc(as, ir->op1, dest, RSET_GPR);
   Reg right = 0;
   if (irref_isk(ir->op2)) {
-    kcmp = emit_isk12(ARMI_CMPi, IR(ir->op2)->i);
+    kcmp = emit_isk12(ARMY_OPK(ARMI_CMP), IR(ir->op2)->i);
     if (kcmp) kmov = emit_isk12(ARMI_MOV, IR(ir->op2)->i);
   }
   if (!kmov) {
@@ -1720,13 +1664,13 @@ static void asm_intmin_max(ASMState *as, IRIns *ir, int cc)
     right = ra_alloc1(as, ir->op2, rset_exclude(RSET_GPR, left));
   }
   if (kmov || dest != right) {
-    emit_dm(as, ARMY_OP_BODY(ARMF_CC(ARMI_MOV, cc), kmov), dest, right);
+    emit_dm2(as, ARMY_OP_BODY(ARMF_CC(ARMI_MOV, cc), kmov), dest, right);
     cc ^= 1;  /* Must use opposite conditions for paired moves. */
   } else {
     cc ^= (CC_LT^CC_GT);  /* Otherwise may swap CC_LT <-> CC_GT. */
   }
-  if (dest != left) emit_dm(as, ARMF_CC(ARMI_MOV, cc), dest, left);
-  emit_nm(as, ARMY_OP_BODY(ARMI_CMPi, kcmp), left, right);
+  if (dest != left) emit_dm2(as, ARMF_CC(ARMI_MOV, cc), dest, left);
+  emit_nm(as, ARMY_OP_BODY(ARMY_OPK(ARMI_CMP), kcmp), left, right);
 }
 
 #if LJ_SOFTFP
@@ -1747,8 +1691,8 @@ static void asm_sfpmin_max(ASMState *as, IRIns *ir, int cc)
       regcost_ref(as->cost[RID_R3]) == args[3]) rset_clear(drop, RID_R3);
   ra_evictset(as, drop);
   ra_destpair(as, ir);
-  emit_dm(as, ARMF_CC(ARMI_MOV, cc), RID_RETHI, RID_R3);
-  emit_dm(as, ARMF_CC(ARMI_MOV, cc), RID_RETLO, RID_R2);
+  emit_dm2(as, ARMF_CC(ARMI_MOV, cc), RID_RETHI, RID_R3);
+  emit_dm2(as, ARMF_CC(ARMI_MOV, cc), RID_RETLO, RID_R2);
   emit_call(as, (void *)ci->func);
   for (r = RID_R0; r <= RID_R3; r++)
     ra_leftov(as, r, args[r-RID_R0]);
@@ -1868,7 +1812,7 @@ static void asm_intcomp(ASMState *as, IRIns *ir)
 	Reg tmp = blref; blref = brref; brref = tmp;
       }
       if (irref_isk(brref)) {
-	m2 = emit_isk12(ARMI_AND, IR(brref)->i);
+	m2 = emit_isk12(ARMY_OPK(ARMI_AND), IR(brref)->i);
 	if (ARMY_MOD_OP(m2))
 	  goto notst;  /* Not beneficial if we miss a constant operand. */
       }
@@ -1884,12 +1828,9 @@ static void asm_intcomp(ASMState *as, IRIns *ir)
   }
 notst:
   left = ra_alloc1(as, lref, RSET_GPR);
-  //TODO need better way to check this out than this
-  // because K12 may fail and then it would return a register
-  // and that's bad news bears
-  ARMIns ai = asm_fuseopmthumb(as, ARMI_CMPi, ARMI_CMPr, rref, rset_exclude(RSET_GPR, left));
+  uint32_t k = asm_fuseopm(as, ARMI_CMP, rref, rset_exclude(RSET_GPR, left));
   asm_guardcc(as, cc);
-  emit_n(as, ai, left);
+  emit_n(as, ARMY_OP_BODY(ARMI_CMP, k), left);
   /* Signed comparison with zero and referencing previous ins? */
   if (cmpprev0 && (cc <= CC_NE || cc >= CC_GE))
     as->flagmcp = as->mcp;  /* Allow elimination of the compare. */
@@ -1909,28 +1850,28 @@ static void asm_int64comp(ASMState *as, IRIns *ir)
   cclo = asm_compmap[ir->o + (signedcomp ? 4 : 0)] & 15;
   leftlo = ra_alloc1(as, ir->op1, allow);
   oldfree = as->freeset;
-  mlo = asm_fuseopm(as, ARMI_CMPr, ir->op2, rset_clear(allow, leftlo));
+  mlo = asm_fuseopm(as, ARMI_CMP, ir->op2, rset_clear(allow, leftlo));
   allow &= ~(oldfree & ~as->freeset);  /* Update for allocs of asm_fuseopm. */
 
   /* Use signed or unsigned comparison for hiword. */
   cchi = asm_compmap[ir->o] & 15;
   lefthi = ra_alloc1(as, (ir+1)->op1, allow);
-  mhi = asm_fuseopm(as, ARMI_CMPr, (ir+1)->op2, rset_clear(allow, lefthi));
+  mhi = asm_fuseopm(as, ARMI_CMP, (ir+1)->op2, rset_clear(allow, lefthi));
 
   /* All register allocations must be performed _before_ this point. */
   if (signedcomp) {
     MCLabel l_around = emit_label(as);
     asm_guardcc(as, cclo);
-    emit_n(as, ARMY_OP_BODY(ARMI_CMPi, mlo), leftlo);
+    emit_n(as, ARMY_OP_BODY(ARMI_CMP, mlo), leftlo);
     emit_branch(as, ARMY_CCB(ARMI_B, CC_NE), l_around);
     ARMY_IT(CC_NE);
     if (cchi == CC_GE || cchi == CC_LE) cchi ^= 6;  /* GE -> GT, LE -> LT */
     asm_guardcc(as, cchi);
   } else {
     asm_guardcc(as, cclo);
-    emit_n(as, ARMY_OP_BODY(ARMF_CC(ARMI_CMPi, CC_EQ), mlo), leftlo);
+    emit_n(as, ARMY_OP_BODY(ARMF_CC(ARMI_CMP, CC_EQ), mlo), leftlo);
   }
-  emit_n(as, ARMY_OP_BODY(ARMI_CMPi, mhi), lefthi);
+  emit_n(as, ARMY_OP_BODY(ARMI_CMP, mhi), lefthi);
 }
 #endif
 
@@ -1990,7 +1931,7 @@ static void asm_hiop(ASMState *as, IRIns *ir)
     as->curins--;
     // TODO fix this on thumb
     asm_intneg(as, ir, ARMI_RSC);
-    asm_intneg(as, ir-1, ARMY_COND(ARMI_RSB));
+    asm_intneg(as, ir-1, ARMY_COND(ARMY_OPK(ARMI_RSB)));
     break;
 #endif
 #if LJ_SOFTFP
@@ -2044,8 +1985,8 @@ static void asm_stack_check(ASMState *as, BCReg topslot,
   ARMY_IT(CC_LS);
   k = emit_isk12(0, (int32_t)(8*topslot));
   lua_assert(k);
-  emit_n(as, ARMY_OP_BODY(ARMI_CMPi, k), RID_TMP);
-  emit_dnm(as, ARMI_SUBr, RID_TMP, RID_TMP, pbase);
+  emit_n(as, ARMY_OP_BODY(ARMY_OPK(ARMI_CMP), k), RID_TMP);
+  emit_dnm2(as, ARMI_SUB, RID_TMP, RID_TMP, pbase);
   emit_lso(as, ARMI_LDRi, RID_TMP, RID_TMP,
 	   (int32_t)offsetof(lua_State, maxstack));
   if (irp) {  /* Must not spill arbitrary registers in head of side trace. */
@@ -2130,7 +2071,7 @@ static void asm_gc_check(ASMState *as)
   l_end = emit_label(as);
   /* Exit trace if in GCSatomic or GCSfinalize. Avoids syncing GC objects. */
   asm_guardcc(as, CC_NE);  /* Assumes asm_snap_prep() already done. */
-  emit_n(as, ARMI_CMPi, RID_RET);
+  emit_n(as, ARMY_OPK(ARMI_CMP), RID_RET);
   args[0] = ASMREF_TMP1;  /* global_State *g */
   args[1] = ASMREF_TMP2;  /* MSize steps     */
   asm_gencall(as, ci, args);
@@ -2140,7 +2081,7 @@ static void asm_gc_check(ASMState *as)
   /* Jump around GC step if GC total < GC threshold. */
   emit_branch(as, ARMY_CCB(ARMI_B, CC_LS), l_end);
   ARMY_IT(CC_LS);
-  emit_nm(as, ARMI_CMPi, RID_TMP, tmp2);
+  emit_nm(as, ARMY_OPK(ARMI_CMP), RID_TMP, tmp2);
   emit_lso(as, ARMI_LDR, tmp2, tmp1,
 	   (int32_t)offsetof(global_State, gc.threshold));
   emit_lso(as, ARMI_LDR, RID_TMP, tmp1,
@@ -2237,9 +2178,9 @@ static void asm_tail_fixup(ASMState *as, TraceNo lnk)
     as->mctop = --p;
   } else {
     /* Patch stack adjustment. */
-    uint32_t k = emit_isk12(ARMI_ADD, spadj);
+    uint32_t k = emit_isk12(ARMY_OPK(ARMI_ADD), spadj);
     lua_assert(k);
-    p[-2] = ARMY_DN(ARMY_OP_BODY(ARMI_ADD, emit_isthumb(ARMI_ADD, spadj)), RID_SP, RID_SP);
+    p[-2] = ARMY_DN(ARMY_OP_BODY(ARMI_ADD, emit_isk12(ARMI_ADD, spadj)), RID_SP, RID_SP);
   }
   /* Patch exit branch. */
   if (lnk) {
@@ -2455,16 +2396,10 @@ void lj_asm_patchexit(jit_State *J, GCtrace *T, ExitNo exitno, MCode *target)
     uint32_t ins = *p;
     if ((ins & 0xf800f000u) == 0xf800f000u && (ARMY_B_READ(*p) ^ (px-p)) == 0) {
       *p = ARMY_B(ARMI_BL, target-p-1);
-      MCode *bad = ARMY_B_READ(*p);
+      MCode *bad = (MCode *) ARMY_B_READ(*p);
       cend = p+1;
       if (!cstart) cstart = p;
     }
- //    if ((ins & 0x0f000000u) == 0x0b000000u && ins < 0xf0000000u &&
-	// ((ins ^ (px-p)) & 0x00ffffffu) == 0) {
- //      *p = (ins & 0xfe000000u) | (((target-p)-2) & 0x00ffffffu);
- //      cend = p+1;
- //      if (!cstart) cstart = p;
- //    }
   }
   lua_assert(cstart != NULL);
   lj_mcode_sync(cstart, cend);
