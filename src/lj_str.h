@@ -20,7 +20,7 @@ LJ_FUNC void LJ_FASTCALL lj_str_free(global_State *g, GCstr *s);
 #define lj_str_newlit(L, s)	(lj_str_new(L, "" s, sizeof(s)-1))
 
 /* Type conversions. */
-LJ_FUNC size_t LJ_FASTCALL lj_str_bufnum(char *s, cTValue *o);
+LJ_FUNC size_t LJ_FASTCALL lj_str_bufnum(lua_State *L, char *s, cTValue *o);
 LJ_FUNC char * LJ_FASTCALL lj_str_bufint(char *p, int32_t k);
 LJ_FUNCA GCstr * LJ_FASTCALL lj_str_fromnum(lua_State *L, const lua_Number *np);
 LJ_FUNC GCstr * LJ_FASTCALL lj_str_fromint(lua_State *L, int32_t k);

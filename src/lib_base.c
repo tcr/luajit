@@ -256,7 +256,7 @@ LJLIB_ASM(tonumber)		LJLIB_REC(.)
   int32_t base = lj_lib_optint(L, 2, 10);
   if (base == 10) {
     TValue *o = lj_lib_checkany(L, 1);
-    if (lj_strscan_numberobj(o)) {
+    if (lj_strscan_numberobj(L, o)) {
       copyTV(L, L->base-1, o);
       return FFH_RES(1);
     }
@@ -519,7 +519,7 @@ LJLIB_CF(print)
       str = p;
     } else if (shortcut && tvisnum(o)) {
       char buf[LJ_STR_NUMBUF];
-      size = lj_str_bufnum(buf, o);
+      size = lj_str_bufnum(L, buf, o);
       str = buf;
     } else {
       copyTV(L, L->top+1, o);

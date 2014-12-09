@@ -19,6 +19,8 @@
 #include "lj_bc.h"
 #include "lj_vm.h"
 #include "lj_strscan.h"
+#include "lj_func.h"
+#include "lauxlib.h"
 
 /* -- Metamethod handling ------------------------------------------------- */
 
@@ -120,11 +122,73 @@ static TValue *mmcall(lua_State *L, ASMFunction cont, cTValue *mo,
   return top+2;  /* Return new base. */
 }
 
+#if LJ_COLONY
+
+int colony_gettable (lua_State*L) {
+  if (!luaL_callmeta(L, 2, "__tostring")) {  /* no metafield? */
+    lua_pushliteral(L, "");
+  }
+  lua_gettable(L, 1);
+  return 1;
+}
+
+int colony_settable (lua_State*L) {
+  if (!luaL_callmeta(L, 2, "__tostring")) {  /* no metafield? */
+    // key = lua_tostring(L, -1);
+    lua_pushliteral(L, "");
+  }
+  lua_pushvalue(L, 3);
+  lua_settable(L, 1);
+  return 0;
+}
+
+#endif
+
 /* -- C helpers for some instructions, called from assembler VM ----------- */
 
 /* Helper for TGET*. __index chain and metamethod. */
 cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
 {
+#if LJ_COLONY
+  TValue tmp;
+  if (G(L)->lang == LANG_JS) {
+    if (tvisfunc(o) && gcref(funcV(o)->c.tab)) {
+      cTValue *tv = lj_tab_get(L, tabref(funcV(o)->c.tab), k);
+      if (!tvisnil(tv) || !(lj_meta_fast(L, tabref(basemt_obj(G(L), o)), MM_index))) {
+        return tv;
+      }
+    }
+    if (tvisstr(k)) {
+      int i = 0;
+      for (; i < strV(k)->len; i++) {
+        if (!(strVdata(k)[i] >= '0' && strVdata(k)[i] <= '9')) {
+          break;
+        }
+      }
+      if (i == strV(k)->len && (strVdata(k)[0] != '0' || strV(k)->len == 1)) {
+        char* end;
+        setnumV(&tmp, strtol(strVdata(k), &end, 10));
+        k = &tmp;
+      }
+    } else if (tvisnum(k) && tvisnan(k)) {
+      setstrV(L, &tmp, lj_str_fromnumber(L, k));
+      k = &tmp;
+    } else if (tvisnil(k)) {
+      setstrV(L, &tmp, lj_str_newz(L, "null"));
+      k = &tmp;
+    } else if (tvisbool(k)) {
+      setstrV(L, &tmp, lj_str_newz(L, boolV(k) ? "true" : "false"));
+      k = &tmp;
+    } else if (tvistab(k) || tvisfunc(k)) {
+      GCfunc *fn = lj_func_newC(L, 2, tabref(L->env));
+      fn->c.f = colony_gettable;
+      TValue mo;
+      setfuncV(L, &mo, fn);
+      L->top = mmcall(L, lj_cont_ra, &mo, o, k);
+      return NULL;
+    }
+  }
+#endif
   int loop;
   for (loop = 0; loop < LJ_MAX_IDXCHAIN; loop++) {
     cTValue *mo;
@@ -152,6 +216,46 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
 TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k)
 {
   TValue tmp;
+#if LJ_COLONY
+  if (G(L)->lang == LANG_JS) {
+    if (tvisfunc(o) && gcref(funcV(o)->c.tab)) {
+      cTValue *tv = lj_tab_get(L, tabref(funcV(o)->c.tab), k);
+      if (!tvisnil(tv) || !(lj_meta_fast(L, tabref(basemt_obj(G(L), o)), MM_newindex))) {
+        setgcV(L, &tmp, gcref(funcV(o)->c.tab), LJ_TTAB);
+        return lj_meta_tset(L, &tmp, k);
+      }
+    }
+    if (tvisstr(k)) {
+      int i = 0;
+      for (; i < strV(k)->len; i++) {
+        if (!(strVdata(k)[i] >= '0' && strVdata(k)[i] <= '9')) {
+          break;
+        }
+      }
+      if (i == strV(k)->len && (strVdata(k)[0] != '0' || strV(k)->len == 1)) {
+        char* end;
+        setnumV(&tmp, strtol(strVdata(k), &end, 10));
+        k = &tmp;
+      }
+    } else if (tvisnum(k) && tvisnan(k)) {
+      setstrV(L, &tmp, lj_str_fromnumber(L, k));
+      k = &tmp;
+    } else if (tvisnil(k)) {
+      setstrV(L, &tmp, lj_str_newz(L, "null"));
+      k = &tmp;
+    } else if (tvisbool(k)) {
+      setstrV(L, &tmp, lj_str_newz(L, boolV(k) ? "true" : "false"));
+      k = &tmp;
+    } else if (tvistab(k) || tvisfunc(k)) {
+      GCfunc *fn = lj_func_newC(L, 3, tabref(L->env));
+      fn->c.f = colony_settable;
+      TValue mo;
+      setfuncV(L, &mo, fn);
+      L->top = mmcall(L, lj_cont_ra, &mo, o, k);
+      return NULL;
+    }
+  }
+#endif
   int loop;
   for (loop = 0; loop < LJ_MAX_IDXCHAIN; loop++) {
     cTValue *mo;
@@ -188,14 +292,19 @@ TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k)
   return NULL;  /* unreachable */
 }
 
-static cTValue *str2num(cTValue *o, TValue *n)
+static cTValue *str2num(lua_State *L, cTValue *o, TValue *n)
 {
   if (tvisnum(o))
     return o;
   else if (tvisint(o))
     return (setnumV(n, (lua_Number)intV(o)), n);
+#if LJ_COLONY
+  else if (G(L)->lang == LANG_LUA && tvisstr(o) && lj_strscan_num(strV(o), n))
+    return n;
+#else
   else if (tvisstr(o) && lj_strscan_num(strV(o), n))
     return n;
+#endif
   else
     return NULL;
 }
@@ -205,10 +314,11 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
 		      BCReg op)
 {
   MMS mm = bcmode_mm(op);
-  TValue tempb, tempc;
+  TValue tempb;
+  TValue tempc;
   cTValue *b, *c;
-  if ((b = str2num(rb, &tempb)) != NULL &&
-      (c = str2num(rc, &tempc)) != NULL) {  /* Try coercion first. */
+  if ((b = str2num(L, rb, &tempb)) != NULL &&
+      (c = str2num(L, rc, &tempc)) != NULL) {  /* Try coercion first. */
     setnumV(ra, lj_vm_foldarith(numV(b), numV(c), (int)mm-MM_add));
     return NULL;
   } else {
@@ -216,7 +326,7 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
     if (tvisnil(mo)) {
       mo = lj_meta_lookup(L, rc, mm);
       if (tvisnil(mo)) {
-	if (str2num(rb, &tempb) == NULL) rc = rb;
+	if (str2num(L, rb, &tempb) == NULL) rc = rb;
 	lj_err_optype(L, rc, LJ_ERR_OPARITH);
 	return NULL;  /* unreachable */
       }
@@ -386,7 +496,7 @@ TValue *lj_meta_comp(lua_State *L, cTValue *o1, cTValue *o2, int op)
     cTValue *mo = lj_meta_lookup(L, tviscdata(o1) ? o1 : o2, mm);
     if (LJ_UNLIKELY(tvisnil(mo))) goto err;
     return mmcall(L, cont, mo, o1, o2);
-  } else if (LJ_52 || itype(o1) == itype(o2)) {
+  } else if (LJ_52 || LJ_COLONY || itype(o1) == itype(o2)) {
     /* Never called with two numbers. */
     if (tvisstr(o1) && tvisstr(o2)) {
       int32_t res = lj_str_cmp(strV(o1), strV(o2));
@@ -397,7 +507,7 @@ TValue *lj_meta_comp(lua_State *L, cTValue *o1, cTValue *o2, int op)
 	ASMFunction cont = (op & 1) ? lj_cont_condf : lj_cont_condt;
 	MMS mm = (op & 2) ? MM_le : MM_lt;
 	cTValue *mo = lj_meta_lookup(L, o1, mm);
-#if LJ_52
+#if LJ_52 || LJ_COLONY
 	if (tvisnil(mo) && tvisnil((mo = lj_meta_lookup(L, o2, mm))))
 #else
 	cTValue *mo2 = lj_meta_lookup(L, o2, mm);
@@ -437,9 +547,9 @@ void lj_meta_call(lua_State *L, TValue *func, TValue *top)
 /* Helper for FORI. Coercion. */
 void LJ_FASTCALL lj_meta_for(lua_State *L, TValue *o)
 {
-  if (!lj_strscan_numberobj(o)) lj_err_msg(L, LJ_ERR_FORINIT);
-  if (!lj_strscan_numberobj(o+1)) lj_err_msg(L, LJ_ERR_FORLIM);
-  if (!lj_strscan_numberobj(o+2)) lj_err_msg(L, LJ_ERR_FORSTEP);
+  if (!lj_strscan_numberobj(L, o)) lj_err_msg(L, LJ_ERR_FORINIT);
+  if (!lj_strscan_numberobj(L, o+1)) lj_err_msg(L, LJ_ERR_FORLIM);
+  if (!lj_strscan_numberobj(L, o+2)) lj_err_msg(L, LJ_ERR_FORSTEP);
   if (LJ_DUALNUM) {
     /* Ensure all slots are integers or all slots are numbers. */
     int32_t k[3];
